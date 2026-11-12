@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\OpenAppMover.Inventory\OpenAppMover.Inventory.csproj" />
+  </ItemGroup>
+</Project>

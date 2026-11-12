@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\OpenAppMover.Collectors\OpenAppMover.Collectors.csproj" />
+  </ItemGroup>
+</Project>

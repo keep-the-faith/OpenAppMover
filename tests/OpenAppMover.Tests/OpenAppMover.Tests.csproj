@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\OpenAppMover.Inventory\OpenAppMover.Inventory.csproj" />
+    <ProjectReference Include="..\..\src\OpenAppMover.Detection\OpenAppMover.Detection.csproj" />
+    <ProjectReference Include="..\..\src\OpenAppMover.Deployment\OpenAppMover.Deployment.csproj" />
+    <ProjectReference Include="..\..\src\OpenAppMover.Host\OpenAppMover.Host.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+</Project>
