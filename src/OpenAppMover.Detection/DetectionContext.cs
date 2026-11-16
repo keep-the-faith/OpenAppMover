@@ -25,7 +25,7 @@ public sealed class DetectionContext(IRegistrySource registry, IFileProbe files,
     /// <summary>System executables used as uninstallers, never scanned.</summary>
     private static readonly string[] SystemLaunchers = ["msiexec.exe", "rundll32.exe", "cmd.exe", "powershell.exe", "wscript.exe"];
 
-    private readonly Dictionary<string, IReadOnlySet<string>> _markerCache = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, ISet<string>> _markerCache = new(StringComparer.OrdinalIgnoreCase);
 
     public IRegistrySource Registry => registry;
     public IFileProbe Files => files;
@@ -42,7 +42,7 @@ public sealed class DetectionContext(IRegistrySource registry, IFileProbe files,
     public static bool IsSystemLauncher(string path) => SystemLaunchers.Any(l => WinPath.FileNameEquals(path, l));
 
     /// <summary>Signatures found in the vendor uninstaller (scanned once per file).</summary>
-    public IReadOnlySet<string> GetUninstallerMarkers(InstalledApp app)
+    public ISet<string> GetUninstallerMarkers(InstalledApp app)
     {
         var path = GetUninstallerPath(app);
         if (path is null || IsSystemLauncher(path))

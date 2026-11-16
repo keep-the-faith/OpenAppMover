@@ -36,7 +36,7 @@ public class ShellLinkTests
     public void RejectsInvalidData()
     {
         Assert.Null(ShellLink.Parse("not a shortcut"u8));
-        var truncated = ShellLinkBuilder.Target(@"C:\a.exe")[..0x50];
+        var truncated = ShellLinkBuilder.Target(@"C:\a.exe").AsSpan(0, 0x50).ToArray();
         Assert.Null(ShellLink.Parse(truncated));
     }
 }

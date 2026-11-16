@@ -100,7 +100,7 @@ public sealed class PackageWriter(IRegistrySource registry, IFileSystem files, I
                 File.Delete(partialPath);
                 partialPath = encryptedPath;
             }
-            File.Move(partialPath, outputPath, overwrite: true);
+            Portable.MoveFile(partialPath, outputPath, overwrite: true);
         }
         catch
         {
@@ -265,7 +265,7 @@ public sealed class PackageWriter(IRegistrySource registry, IFileSystem files, I
                 Path = tokenized,
                 Entry = entryName,
                 Size = size,
-                Sha256 = Convert.ToHexString(hash.GetHashAndReset()).ToLowerInvariant(),
+                Sha256 = Portable.ToHexString(hash.GetHashAndReset()).ToLowerInvariant(),
                 LastWriteUtc = lastWrite,
                 Attributes = meta?.Attributes ?? FileAttributes.Normal,
                 RewritePaths = rewrite,

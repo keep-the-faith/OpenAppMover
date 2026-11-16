@@ -47,6 +47,13 @@ public static class PrerequisiteAnalyzer
             .Where(f => f.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
             .Take(MaxBinaries);
         var architectures = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        // Highest minimum Windows version, with the reason.
+        (Version Version, string Reason)? windows = null;
+        void RequireWindows(Version version, string reason)
+        {
+            if (version > Windows7 && (windows is null || version > windows.Value.Version))
+                windows = (version, reason);
+        }
 
         foreach (var binary in binaries)
         {
@@ -67,7 +74,15 @@ public static class PrerequisiteAnalyzer
                 else if (DirectXPrefixes.Any(p => import.StartsWith(p, StringComparison.OrdinalIgnoreCase)))
                     found.Add(new Prerequisite(PrerequisiteKind.DirectX, "DirectX End-User Runtime (June 2010)", $"{name} imports {import}")
                         { Architecture = arch, Version = import });
+
+                if (import.StartsWith("api-ms-win-crt-", StringComparison.OrdinalIgnoreCase) || import.Equals("ucrtbase.dll", StringComparison.OrdinalIgnoreCase))
+                    found.Add(new Prerequisite(PrerequisiteKind.UniversalCrt, $"Universal C Runtime ({arch})", $"{name} imports {import}")
+                        { Architecture = arch });
             }
+
+            // Windows does not start an executable made for a later version than its own.
+            if (pe.SubsystemVersion is { } subsystem && binary.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+                RequireWindows(subsystem, $"{name} is made for {WindowsName(subsystem)} and later");
 
             // A managed .exe without runtimeconfig.json runs on the .NET Framework.
             if (pe.IsManaged && binary.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
@@ -83,13 +98,39 @@ public static class PrerequisiteAnalyzer
             found.Add(new Prerequisite(PrerequisiteKind.WebView2, "Microsoft Edge WebView2 Runtime", "The application ships WebView2Loader.dll"));
 
         foreach (var config in allFiles.Where(f => f.EndsWith(".runtimeconfig.json", StringComparison.OrdinalIgnoreCase)))
-            found.AddRange(ReadRuntimeConfig(files, config, architectures));
+        {
+            foreach (var prerequisite in ReadRuntimeConfig(files, config, architectures))
+            {
+                found.Add(prerequisite);
+                // .NET 7 and later: Windows 10 and later (.NET 5 and 6 still run on Windows 7 SP1).
+                if (System.Version.TryParse(prerequisite.Version, out var dotnet) && dotnet.Major >= 7)
+                    RequireWindows(Windows10, $"{prerequisite.Name} needs {WindowsName(Windows10)} or later");
+            }
+        }
+
+        if (windows is { } minimum)
+            found.Add(new Prerequisite(PrerequisiteKind.Windows, $"{WindowsName(minimum.Version)} or later", minimum.Reason)
+                { Version = minimum.Version.ToString(2) });
 
         return found
             .GroupBy(p => (p.Kind, p.Architecture, p.Version, p.Framework))
             .Select(g => g.First())
             .ToList();
     }
+
+    private static readonly Version Windows7 = new(6, 1);
+    private static readonly Version Windows10 = new(10, 0);
+
+    /// <summary>Marketing name of a Windows version (client editions).</summary>
+    public static string WindowsName(Version version) => (version.Major, version.Minor) switch
+    {
+        (6, 0) => "Windows Vista",
+        (6, 1) => "Windows 7",
+        (6, 2) => "Windows 8",
+        (6, 3) => "Windows 8.1",
+        (10, _) => "Windows 10",
+        _ => $"Windows {version.Major}.{version.Minor}",
+    };
 
     private static PeInfo? Read(IFileSystem files, string path)
     {
@@ -139,7 +180,7 @@ public static class PrerequisiteAnalyzer
                 var version = framework.TryGetProperty("version", out var v) ? v.GetString() : null;
                 if (name is null || version is null)
                     continue;
-                var majorMinor = string.Join('.', version.Split('.').Take(2));
+                var majorMinor = string.Join(".", version.Split('.').Take(2));
                 yield return new Prerequisite(PrerequisiteKind.DotNet,
                     $"{DotNetFrameworkNames.GetValueOrDefault(name, name)} {majorMinor} ({arch})",
                     $"{WinPath.GetFileName(path)} requires {name} {version}")

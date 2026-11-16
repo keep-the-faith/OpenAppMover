@@ -14,6 +14,10 @@ public enum PrerequisiteKind
     WebView2,
     /// <summary>DirectX End-User Runtime (June 2010); <see cref="Prerequisite.Version"/> is the missing DLL.</summary>
     DirectX,
+    /// <summary>Minimum Windows version; <see cref="Prerequisite.Version"/> is "major.minor" ("6.2": Windows 8).</summary>
+    Windows,
+    /// <summary>Universal C Runtime (ucrtbase.dll): part of Windows 10, an update (KB2999226) on Windows 7 / 8.1.</summary>
+    UniversalCrt,
 }
 
 /// <summary>A runtime the application needs and that is not part of its files.</summary>

@@ -14,7 +14,8 @@ public static class PeBuilder
     private const int SectionOffset = 0x200;
     private const int SectionSize = 0x1000;
 
-    public static byte[] Build(ushort machine, string[] imports, string? clrVersion = null, Version? version = null)
+    /// <param name="subsystem">MajorSubsystemVersion.MinorSubsystemVersion (minimum Windows version), 0.0 when null.</param>
+    public static byte[] Build(ushort machine, string[] imports, string? clrVersion = null, Version? version = null, Version? subsystem = null)
     {
         var pe32Plus = machine != PeInfo.MachineX86;
         var optionalSize = pe32Plus ? 240 : 224;
@@ -35,6 +36,12 @@ public static class PeBuilder
 
         var optional = 0x40 + 24;
         writer.Write((ushort)(pe32Plus ? 0x20B : 0x10B));
+        if (subsystem is not null)
+        {
+            writer.Seek(optional + 48, SeekOrigin.Begin);
+            writer.Write((ushort)subsystem.Major);
+            writer.Write((ushort)subsystem.Minor);
+        }
         writer.Seek(optional + (pe32Plus ? 108 : 92), SeekOrigin.Begin);
         writer.Write(16);                // NumberOfRvaAndSizes
         var directories = optional + (pe32Plus ? 112 : 96);

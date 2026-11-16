@@ -11,6 +11,7 @@ namespace OpenAppMover.Collectors.Collectors;
 public sealed class HeuristicDataCollector : ICollector
 {
     public string Name => "Heuristic";
+    public CollectionPhase Phase => CollectionPhase.Main;
 
     public IEnumerable<CollectedItem> Collect(CollectionContext context)
     {

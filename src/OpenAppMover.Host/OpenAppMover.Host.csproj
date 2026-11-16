@@ -18,7 +18,8 @@
     <InternalsVisibleTo Include="OpenAppMover.Tests" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="System.Management" />
+    <PackageReference Include="System.Management" Condition="'$(TargetFrameworkIdentifier)' != '.NETFramework'" />
+    <Reference Include="System.Management" Condition="'$(TargetFrameworkIdentifier)' == '.NETFramework'" />
     <PackageReference Include="Microsoft.Diagnostics.Tracing.TraceEvent" GeneratePathProperty="true" />
   </ItemGroup>
 </Project>

@@ -41,8 +41,13 @@ public sealed partial class InnoSetupRule : IDetectionRule
         return candidate.NullIfEmpty();
     }
 
+#if NET7_0_OR_GREATER
     [GeneratedRegex(@"^unins\d{3}\.exe$", RegexOptions.IgnoreCase)]
     private static partial Regex UninstallerName();
+#else
+    private static Regex? _uninstallerName;
+    private static Regex UninstallerName() => _uninstallerName ??= new(@"^unins\d{3}\.exe$", RegexOptions.IgnoreCase);
+#endif
 }
 
 /// <summary>Nullsoft Scriptable Install System.</summary>

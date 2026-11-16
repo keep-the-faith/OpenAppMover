@@ -134,7 +134,7 @@ public sealed partial class AppKeywords
         var words = publisher.Replace(",", " ").Split(' ', StringSplitOptions.RemoveEmptyEntries).ToList();
         while (words.Count > 1 && CompanySuffixes.Contains(Normalize(words[^1])))
             words.RemoveAt(words.Count - 1);
-        return string.Join(' ', words).Trim('.', ' ');
+        return string.Join(" ", words).Trim('.', ' ');
     }
 
     private static void Add(List<string> target, string text)
@@ -144,15 +144,35 @@ public sealed partial class AppKeywords
             target.Add(n);
     }
 
+#if NET7_0_OR_GREATER
     [GeneratedRegex(@"\([^)]*\)|\[[^\]]*\]")]
     private static partial Regex Brackets();
+#else
+    private static Regex? _brackets;
+    private static Regex Brackets() => _brackets ??= new(@"\([^)]*\)|\[[^\]]*\]");
+#endif
 
+#if NET7_0_OR_GREATER
     [GeneratedRegex(@"\b(x64|x86|x86_64|amd64|arm64|win64|win32|64-bit|32-bit|64\s?bit|32\s?bit)\b", RegexOptions.IgnoreCase)]
     private static partial Regex Architecture();
+#else
+    private static Regex? _architecture;
+    private static Regex Architecture() => _architecture ??= new(@"\b(x64|x86|x86_64|amd64|arm64|win64|win32|64-bit|32-bit|64\s?bit|32\s?bit)\b", RegexOptions.IgnoreCase);
+#endif
 
+#if NET7_0_OR_GREATER
     [GeneratedRegex(@"\b(version\s+)?v?\d+(\.\d+)+[\w.-]*|\bversion\b|\s\d+$", RegexOptions.IgnoreCase)]
     private static partial Regex Version();
+#else
+    private static Regex? _version;
+    private static Regex Version() => _version ??= new(@"\b(version\s+)?v?\d+(\.\d+)+[\w.-]*|\bversion\b|\s\d+$", RegexOptions.IgnoreCase);
+#endif
 
+#if NET7_0_OR_GREATER
     [GeneratedRegex(@"\s+")]
     private static partial Regex Spaces();
+#else
+    private static Regex? _spaces;
+    private static Regex Spaces() => _spaces ??= new(@"\s+");
+#endif
 }

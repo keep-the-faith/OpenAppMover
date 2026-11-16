@@ -14,6 +14,7 @@ public sealed class InstallerLogCollector : ICollector
     private static readonly string[] LogNames = ["install.log", "uninstall.log", "setup.log", "INSTALL.LOG", "uninst.log"];
 
     public string Name => "Installer log";
+    public CollectionPhase Phase => CollectionPhase.Main;
 
     public IEnumerable<CollectedItem> Collect(CollectionContext context)
     {

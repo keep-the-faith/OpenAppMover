@@ -35,8 +35,7 @@ public sealed class SevenZipNsisScriptReader(ILogger logger) : INsisScriptReader
             UseShellExecute = false,
             CreateNoWindow = true,
         };
-        foreach (var argument in new[] { "e", "-so", "-y", executablePath, ScriptName })
-            info.ArgumentList.Add(argument);
+        Portable.AddArguments(info, ["e", "-so", "-y", executablePath, ScriptName]);
 
         try
         {

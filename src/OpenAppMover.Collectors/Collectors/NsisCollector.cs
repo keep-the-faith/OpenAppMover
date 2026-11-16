@@ -13,6 +13,7 @@ namespace OpenAppMover.Collectors.Collectors;
 public sealed partial class NsisCollector : ICollector
 {
     public string Name => "NSIS script";
+    public CollectionPhase Phase => CollectionPhase.Main;
 
     public IEnumerable<CollectedItem> Collect(CollectionContext context)
     {
@@ -166,6 +167,11 @@ public sealed partial class NsisCollector : ICollector
 
     private static string Unescape(string text) => text.Replace("$$", "$").Replace("$\\\"", "\"");
 
+#if NET7_0_OR_GREATER
     [GeneratedRegex(@"\$(\$|\\[""tnr]|\{[A-Za-z_][A-Za-z0-9_]*\}|[A-Za-z_][A-Za-z0-9_]*)")]
     private static partial Regex Variable();
+#else
+    private static Regex? _variable;
+    private static Regex Variable() => _variable ??= new(@"\$(\$|\\[""tnr]|\{[A-Za-z_][A-Za-z0-9_]*\}|[A-Za-z_][A-Za-z0-9_]*)");
+#endif
 }

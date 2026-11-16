@@ -1,5 +1,4 @@
 using System.IO.Compression;
-using System.Security.Cryptography;
 using System.Text.Json;
 using OpenAppMover.Core.Models;
 using OpenAppMover.Core.Registry;
@@ -77,7 +76,7 @@ public sealed class PackagingTests : IDisposable
         var editor = Assert.Single(manifest.Files, f => f.Path == @"{InstallDir}\editor.exe");
         Assert.Equal("files/InstallDir/editor.exe", editor.Entry);
         Assert.Equal(6, editor.Size);
-        Assert.Equal(Convert.ToHexString(SHA256.HashData("EDITOR"u8)).ToLowerInvariant(), editor.Sha256);
+        Assert.Equal(Portable.ToHexString(Portable.Sha256("EDITOR"u8)).ToLowerInvariant(), editor.Sha256);
         Assert.Equal(FakeFileSystem.LastWrite, editor.LastWriteUtc);
 
         Assert.Contains(@"{InstallDir}\empty", manifest.Directories);

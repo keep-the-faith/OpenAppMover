@@ -237,6 +237,7 @@ public enum CollectionPhase
 public interface ICollector
 {
     string Name { get; }
-    CollectionPhase Phase => CollectionPhase.Main;
+    /// <summary>Main for most collectors (no default implementation: unsupported by .NET Framework).</summary>
+    CollectionPhase Phase { get; }
     IEnumerable<CollectedItem> Collect(CollectionContext context);
 }

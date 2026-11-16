@@ -83,6 +83,6 @@ public sealed class SnapshotFallbackFileSystem(IFileSystem inner, ISnapshotProvi
     public IEnumerable<string> EnumerateFiles(string path, string pattern = "*", bool recursive = false) => inner.EnumerateFiles(path, pattern, recursive);
     public FileMeta? GetFileMeta(string path) => inner.GetFileMeta(path);
 
-    public IReadOnlySet<string> FindMarkers(string path, IReadOnlyCollection<string> markers, long maxBytes) =>
+    public ISet<string> FindMarkers(string path, IReadOnlyCollection<string> markers, long maxBytes) =>
         inner.FindMarkers(path, markers, maxBytes);
 }

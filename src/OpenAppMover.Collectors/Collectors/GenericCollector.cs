@@ -9,6 +9,7 @@ namespace OpenAppMover.Collectors.Collectors;
 public sealed class GenericCollector : ICollector
 {
     public string Name => "Generic";
+    public CollectionPhase Phase => CollectionPhase.Main;
 
     public IEnumerable<CollectedItem> Collect(CollectionContext context)
     {

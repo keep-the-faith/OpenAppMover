@@ -52,7 +52,7 @@ public sealed class DeploymentStore(IWritableFileSystem files, string root)
     /// <summary>A new id: readable and unique ("AcmeEditor-20261111-174500-3f2a").</summary>
     public static string NewId(string appKey)
     {
-        var name = new string(appKey.Where(char.IsAsciiLetterOrDigit).Take(40).ToArray());
+        var name = new string(appKey.Where(Portable.IsAsciiLetterOrDigit).Take(40).ToArray());
         return $"{(name.Length == 0 ? "app" : name)}-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid().ToString("N")[..4]}";
     }
 

@@ -52,7 +52,7 @@ public class TextCodecTests
             "utf-8-bom" => [.. Encoding.UTF8.GetPreamble(), .. Encoding.UTF8.GetBytes(text)],
             "utf-8" => Encoding.UTF8.GetBytes(text),
             "utf-16" => [.. Encoding.Unicode.GetPreamble(), .. Encoding.Unicode.GetBytes(text)],
-            _ => Encoding.Latin1.GetBytes(text),
+            _ => Portable.Latin1.GetBytes(text),
         };
 
         var decoded = TextCodec.Decode(bytes);
@@ -158,7 +158,8 @@ public class EncryptionTests
     [Fact]
     public void RoundTrip()
     {
-        var data = RandomNumberGenerator.GetBytes(200_000);
+        var data = new byte[200_000];
+        Portable.FillRandom(data);
         using var encrypted = new MemoryStream();
         PackageCrypto.Encrypt(new MemoryStream(data), encrypted, "correct horse", iterations: 1000);
 

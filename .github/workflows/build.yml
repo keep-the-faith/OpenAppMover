@@ -1,6 +1,7 @@
 name: build
 
-# Every push and pull request: build, test, publish, and upload the executables as a workflow artifact.
+# Every push and pull request: build, test (.NET 8 and .NET Framework 4.8), publish, and upload the executables as a
+# workflow artifact: Windows 10/11 (.NET 8) and Windows 7 SP1 / 8.1+ (.NET Framework 4.8, "-legacy", with their .exe.config).
 # A tag "v<version>" (e.g. v1.0.0, v1.1.0-beta.1) also creates the GitHub Release with the executables, a zip and the
 # notes of that version from CHANGELOG.md. The tag must match <Version> in Directory.Build.props.
 on:
@@ -36,8 +37,13 @@ jobs:
 
       - run: dotnet build -c Release
       - run: dotnet test -c Release --no-build
-      - run: dotnet publish src/OpenAppMover.Cli -c Release -o dist
-      - run: dotnet publish src/OpenAppMover.Gui -c Release -o dist
+      - run: dotnet publish src/OpenAppMover.Cli -c Release -f net8.0 -o dist
+      - run: dotnet publish src/OpenAppMover.Gui -c Release -f net8.0-windows -o dist
+      - run: dotnet publish src/OpenAppMover.Cli -c Release -f net48 -o publish-legacy
+      - run: dotnet publish src/OpenAppMover.Gui -c Release -f net48 -o publish-legacy
+      - name: Keep only the legacy executables (dependencies merged by Costura)
+        shell: pwsh
+        run: Copy-Item publish-legacy/openappmover-legacy.exe*, publish-legacy/openappmover-gui-legacy.exe* dist/
 
       - name: Add the license and notices, make the zip
         shell: pwsh
@@ -45,7 +51,8 @@ jobs:
           Copy-Item LICENSE dist/LICENSE.txt
           New-Item -ItemType Directory -Force dist/third-party/7-Zip | Out-Null
           Copy-Item third_party/7-Zip/License.txt, third_party/7-Zip/README.txt dist/third-party/7-Zip/
-          Compress-Archive -Path dist/openappmover.exe, dist/openappmover-gui.exe, dist/LICENSE.txt, dist/third-party `
+          Compress-Archive -Path dist/openappmover.exe, dist/openappmover-gui.exe, dist/openappmover-legacy.exe*, `
+            dist/openappmover-gui-legacy.exe*, dist/LICENSE.txt, dist/third-party `
             -DestinationPath "dist/openappmover-${{ steps.version.outputs.version }}-win-x64.zip"
 
       - uses: actions/upload-artifact@v4
@@ -54,6 +61,8 @@ jobs:
           path: |
             dist/openappmover.exe
             dist/openappmover-gui.exe
+            dist/openappmover-legacy.exe*
+            dist/openappmover-gui-legacy.exe*
             dist/openappmover-*-win-x64.zip
             dist/LICENSE.txt
             dist/third-party
@@ -91,7 +100,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ needs.build.outputs.version }}
         run: |
-          assets=(dist/openappmover.exe dist/openappmover-gui.exe "dist/openappmover-$VERSION-win-x64.zip")
+          assets=(dist/openappmover.exe dist/openappmover-gui.exe dist/openappmover-legacy.exe dist/openappmover-legacy.exe.config \
+            dist/openappmover-gui-legacy.exe dist/openappmover-gui-legacy.exe.config "dist/openappmover-$VERSION-win-x64.zip")
           # A version with a suffix (1.1.0-beta.1) is published as a pre-release.
           prerelease=()
           [[ "$VERSION" == *-* ]] && prerelease=(--prerelease)

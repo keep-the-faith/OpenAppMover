@@ -122,7 +122,7 @@ public sealed class FakeFileSystem : IWritableFileSystem
 
     /// <summary>Files (with their content) and folders, sorted, excluding those under <paramref name="excluded"/>.</summary>
     public List<string> Snapshot(string? excluded = null) =>
-        _files.Select(f => $"{f.Key} = {Convert.ToHexString(f.Value)}")
+        _files.Select(f => $"{f.Key} = {Portable.ToHexString(f.Value)}")
             .Concat(_directories.Select(d => d + @""))
             .Where(p => excluded is null || !p.StartsWith(excluded, StringComparison.OrdinalIgnoreCase))
             .Order(StringComparer.OrdinalIgnoreCase)
@@ -147,7 +147,7 @@ public sealed class FakeFileSystem : IWritableFileSystem
         return _files.TryGetValue(normalized, out var content) ? new MemoryStream(content, writable: false) : throw new FileNotFoundException(path);
     }
 
-    public IReadOnlySet<string> FindMarkers(string path, IReadOnlyCollection<string> markers, long maxBytes)
+    public ISet<string> FindMarkers(string path, IReadOnlyCollection<string> markers, long maxBytes)
     {
         ScanCount++;
         return _files.TryGetValue(WinPath.Normalize(path), out var content)

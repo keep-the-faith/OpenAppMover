@@ -185,6 +185,19 @@ public class CollectorTests
     }
 
     [Fact]
+    public void ShellExtensionHandlers()
+    {
+        const string classes = @"HKLM64\SOFTWARE\Classes";
+        Assert.Equal(ItemRole.Com, Find($@"{classes}\*\shellex\ContextMenuHandlers\Acme").Role);
+        Assert.Equal(Confidence.Certain, Find($@"{classes}\Directory\Background\shellex\ContextMenuHandlers\Acme").Confidence);
+        Find($@"{classes}\Drive\shellex\DragDropHandlers\{ClsId}");
+        Find($@"{classes}\SystemFileAssociations\.acme\shellex\{{e357fccd-a995-4576-b01f-234630154e96}}");
+        Find($@"HKLM64\SOFTWARE\Microsoft\Windows\CurrentVersion\Shell Extensions\Approved → {ClsId}");
+        Absent(@"ContextMenuHandlers\Other");
+        Absent("→ {99999999");
+    }
+
+    [Fact]
     public void Keywords()
     {
         Assert.Contains("acmeeditor", _result.Keywords.Products);

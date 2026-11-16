@@ -345,7 +345,7 @@ internal sealed partial class Commands(ILoggerFactory loggerFactory)
         Console.WriteLine("Registry values:");
         foreach (var value in app.RawValues.Values.OrderBy(v => v.Name, StringComparer.OrdinalIgnoreCase))
         {
-            var data = value.AsString() ?? (value.Binary is { } bytes ? Convert.ToHexString(bytes) : "");
+            var data = value.AsString() ?? (value.Binary is { } bytes ? Portable.ToHexString(bytes) : "");
             Console.WriteLine($"  {(value.Name.Length == 0 ? "(Default)" : value.Name)} [{value.Type}] = {data}");
         }
     }

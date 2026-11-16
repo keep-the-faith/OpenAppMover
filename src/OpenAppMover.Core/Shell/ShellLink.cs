@@ -51,7 +51,7 @@ public static class ShellLink
     private static ShellLinkInfo? ParseCore(ReadOnlySpan<byte> data)
     {
         if (data.Length < HeaderSize || BinaryPrimitives.ReadUInt32LittleEndian(data) != HeaderSize
-            || new Guid(data.Slice(4, 16)) != LinkClsid)
+            || Portable.ToGuid(data.Slice(4, 16)) != LinkClsid)
             return null;
 
         var flags = BinaryPrimitives.ReadUInt32LittleEndian(data[0x14..]);
@@ -120,7 +120,7 @@ public static class ShellLink
         var count = BinaryPrimitives.ReadUInt16LittleEndian(data[pos..]);
         pos += 2;
         var length = unicode ? count * 2 : count;
-        var text = (unicode ? Encoding.Unicode : Encoding.Latin1).GetString(data.Slice(pos, length));
+        var text = (unicode ? Encoding.Unicode : Portable.Latin1).GetString(data.Slice(pos, length));
         pos += length;
         return text;
     }
@@ -161,7 +161,7 @@ public static class ShellLink
     private static string ReadNullTerminatedAnsi(ReadOnlySpan<byte> data)
     {
         var end = data.IndexOf((byte)0);
-        return Encoding.Latin1.GetString(end < 0 ? data : data[..end]);
+        return Portable.Latin1.GetString(end < 0 ? data : data[..end]);
     }
 
     private static string ReadNullTerminatedUnicode(ReadOnlySpan<byte> data)

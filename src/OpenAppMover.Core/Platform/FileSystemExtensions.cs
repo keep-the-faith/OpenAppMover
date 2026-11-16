@@ -20,7 +20,7 @@ public static class FileSystemExtensions
         {
             var match = files.EnumerateDirectories(current).FirstOrDefault(d => WinPath.FileNameEquals(d, segments[i]));
             if (match is null)
-                return WinPath.Combine(current, string.Join('\\', segments[i..]));
+                return WinPath.Combine(current, string.Join("\\", segments.Skip(i)));
             current = WinPath.Combine(current, WinPath.GetFileName(match));
         }
         return current;

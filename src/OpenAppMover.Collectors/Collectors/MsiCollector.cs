@@ -17,6 +17,7 @@ public sealed partial class MsiCollector : ICollector
     private const int Component64Bit = 0x100;
 
     public string Name => "Windows Installer";
+    public CollectionPhase Phase => CollectionPhase.Main;
 
     public IEnumerable<CollectedItem> Collect(CollectionContext context)
     {
@@ -70,7 +71,7 @@ public sealed partial class MsiCollector : ICollector
         var installed = msi.Components.Select(c => c.PackedId).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var components = (reader.Query(database, "SELECT `Component`, `ComponentId`, `Attributes` FROM `Component`") ?? [])
             .Where(r => r[0] is not null && r[1] is not null)
-            .ToDictionary(r => r[0]!, r => (Packed: MsiGuid.Pack(r[1]!), Attributes: int.TryParse(r[2], CultureInfo.InvariantCulture, out var a) ? a : 0));
+            .ToDictionary(r => r[0]!, r => (Packed: MsiGuid.Pack(r[1]!), Attributes: int.TryParse(r[2], NumberStyles.Integer, CultureInfo.InvariantCulture, out var a) ? a : 0));
         var properties = (reader.Query(database, "SELECT `Property`, `Value` FROM `Property`") ?? [])
             .Where(r => r[0] is not null)
             .ToDictionary(r => r[0]!, r => r[1] ?? "");
@@ -79,7 +80,7 @@ public sealed partial class MsiCollector : ICollector
         foreach (var row in rows)
         {
             if (row[4] is null || !components.TryGetValue(row[4]!, out var component) || component.Packed is null
-                || !installed.Contains(component.Packed) || !int.TryParse(row[0], CultureInfo.InvariantCulture, out var root)
+                || !installed.Contains(component.Packed) || !int.TryParse(row[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out var root)
                 || Resolve(row[1], properties) is not { } key)
                 continue;
 
@@ -115,6 +116,11 @@ public sealed partial class MsiCollector : ICollector
         return unresolved || result.Contains('[') ? null : result;
     }
 
+#if NET7_0_OR_GREATER
     [GeneratedRegex(@"\[([A-Za-z_][A-Za-z0-9_.]*)\]")]
     private static partial Regex PropertyReference();
+#else
+    private static Regex? _propertyReference;
+    private static Regex PropertyReference() => _propertyReference ??= new(@"\[([A-Za-z_][A-Za-z0-9_.]*)\]");
+#endif
 }

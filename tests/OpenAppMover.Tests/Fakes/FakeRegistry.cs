@@ -48,7 +48,7 @@ public sealed class FakeRegistry : IRegistrySource, IRegistryWriter
     public void DeleteKeyTree(RegHive hive, RegView view, string path)
     {
         var parts = Split(path);
-        var parent = Find(Root(hive, view), string.Join('\\', parts[..^1]));
+        var parent = Find(Root(hive, view), string.Join("\\", parts.Take(parts.Length - 1)));
         parent?.Children.Remove(parts[^1]);
     }
 
@@ -61,7 +61,7 @@ public sealed class FakeRegistry : IRegistrySource, IRegistryWriter
             if (prefix.Contains('\\'))
                 lines.Add(prefix); // roots are created on first access: not part of the content
             foreach (var value in node.Values.Values)
-                lines.Add($"{prefix} | {value.Name} = {value.Type}:{value.AsString() ?? Convert.ToHexString(value.Binary ?? [])}");
+                lines.Add($"{prefix} | {value.Name} = {value.Type}:{value.AsString() ?? Portable.ToHexString(value.Binary ?? [])}");
             foreach (var child in node.Children.Values)
                 Walk(child, $@"{prefix}\{child.Name}");
         }

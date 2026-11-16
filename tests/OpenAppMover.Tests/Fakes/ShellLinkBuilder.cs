@@ -19,7 +19,7 @@ public static class ShellLinkBuilder
         WriteHeader(writer, flags);
 
         // LinkInfo with a 0x1C-byte header, LocalBasePath then an empty CommonPathSuffix.
-        var basePath = Encoding.Latin1.GetBytes(target + "\0");
+        var basePath = Portable.Latin1.GetBytes(target + "\0");
         var size = 0x1C + basePath.Length + 1;
         writer.Write(size);
         writer.Write(0x1C);           // LinkInfoHeaderSize
@@ -48,7 +48,7 @@ public static class ShellLinkBuilder
         writer.Write(8 + 260 + 520);
         writer.Write(0xA0000006);
         var ansi = new byte[260];
-        Encoding.Latin1.GetBytes(darwinId).CopyTo(ansi, 0);
+        Portable.Latin1.GetBytes(darwinId).CopyTo(ansi, 0);
         writer.Write(ansi);
         var unicode = new byte[520];
         Encoding.Unicode.GetBytes(darwinId).CopyTo(unicode, 0);

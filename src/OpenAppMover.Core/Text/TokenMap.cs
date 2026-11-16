@@ -43,6 +43,11 @@ public sealed partial class TokenMap(IReadOnlyDictionary<string, string> folders
         });
 
     // GUIDs ("{1111-…}") are not tokens: they contain dashes.
+#if NET7_0_OR_GREATER
     [GeneratedRegex(@"\{([A-Za-z][A-Za-z0-9_.]*)(?::(json|slash))?\}")]
     private static partial Regex Token();
+#else
+    private static Regex? _token;
+    private static Regex Token() => _token ??= new(@"\{([A-Za-z][A-Za-z0-9_.]*)(?::(json|slash))?\}");
+#endif
 }

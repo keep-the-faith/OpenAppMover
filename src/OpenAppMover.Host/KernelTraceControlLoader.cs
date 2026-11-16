@@ -31,7 +31,7 @@ internal static class KernelTraceControlLoader
             var flag = LoadedFlag ?? throw new MissingFieldException(
                 "This version of TraceEvent no longer has ETWKernelControl.s_KernelTraceControlLoaded: update KernelTraceControlLoader.");
             // Same file name as the DllImport, so that the loaded module is found by name.
-            NativeLibrary.Load(EmbeddedTools.Extract(ResourceName, hash => Path.Combine($"KernelTraceControl-{hash}", "KernelTraceControl.dll")));
+            Portable.LoadNativeLibrary(EmbeddedTools.Extract(ResourceName, hash => Path.Combine($"KernelTraceControl-{hash}", "KernelTraceControl.dll")));
             flag.SetValue(null, true);
             _loaded = true;
         }

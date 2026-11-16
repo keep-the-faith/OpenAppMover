@@ -17,6 +17,12 @@ public sealed record PeInfo(ushort Machine, string? ClrVersion, IReadOnlyList<st
     /// <summary>File version of the version resource (VS_FIXEDFILEINFO), null when the file has none.</summary>
     public Version? FileVersion { get; init; }
 
+    /// <summary>
+    /// Minimum Windows version of the image (MajorSubsystemVersion.MinorSubsystemVersion): Windows refuses to load an
+    /// image whose version is above its own ("6.2": Windows 8 and later).
+    /// </summary>
+    public Version? SubsystemVersion { get; init; }
+
     /// <summary>"x64", "x86", "arm64", or null for other machines.</summary>
     public string? Architecture => Machine switch
     {
@@ -77,6 +83,8 @@ public static class PeReader
         var pe32Plus = magic == 0x20B;
         if (magic != 0x10B && !pe32Plus)
             return null;
+        stream.Position = optionalHeader + 48;
+        var subsystemVersion = new Version(reader.ReadUInt16(), reader.ReadUInt16());
         stream.Position = optionalHeader + (pe32Plus ? 108 : 92);
         var directoryCount = reader.ReadUInt32();
         var directories = new (uint Rva, uint Size)[Math.Min(directoryCount, 16)];
@@ -138,6 +146,7 @@ public static class PeReader
         return new PeInfo(machine, ReadClrVersion(reader, directories, Offset), imports.Distinct().ToList())
         {
             FileVersion = ReadFileVersion(reader, directories, Offset),
+            SubsystemVersion = subsystemVersion,
         };
     }
 

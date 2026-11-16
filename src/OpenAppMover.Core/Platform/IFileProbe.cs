@@ -9,5 +9,5 @@ public interface IFileProbe
     /// Searches the first <paramref name="maxBytes"/> bytes of a file for the markers (ASCII and UTF-16LE).
     /// Returns the markers found (empty if none or if the file cannot be read).
     /// </summary>
-    IReadOnlySet<string> FindMarkers(string path, IReadOnlyCollection<string> markers, long maxBytes);
+    ISet<string> FindMarkers(string path, IReadOnlyCollection<string> markers, long maxBytes);
 }

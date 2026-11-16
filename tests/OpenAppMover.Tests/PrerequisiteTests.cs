@@ -39,6 +39,13 @@ public class PeReaderTests
     }
 
     [Fact]
+    public void ReadsTheSubsystemVersion()
+    {
+        Assert.Equal(new Version(6, 2), PeReader.Read(new MemoryStream(PeBuilder.Build(PeInfo.MachineX64, ["kernel32.dll"], subsystem: new Version(6, 2))))!.SubsystemVersion);
+        Assert.Equal(new Version(5, 1), PeReader.Read(new MemoryStream(PeBuilder.Build(PeInfo.MachineX86, ["kernel32.dll"], subsystem: new Version(5, 1))))!.SubsystemVersion);
+    }
+
+    [Fact]
     public void RejectsOtherFiles()
     {
         Assert.Null(PeReader.Read(new MemoryStream(Encoding.ASCII.GetBytes("MZ but nothing else"))));
@@ -94,11 +101,48 @@ public class PrerequisiteAnalyzerTests
 
         var prerequisites = Analyze();
 
-        Assert.Equal(2, prerequisites.Count);
+        Assert.Equal(3, prerequisites.Count);
         Assert.Contains(prerequisites, p => p is { Kind: PrerequisiteKind.NetFramework, Name: ".NET Framework 4.x" });
         var dotnet = Assert.Single(prerequisites, p => p.Kind == PrerequisiteKind.DotNet);
         Assert.Equal(("Microsoft.WindowsDesktop.App", "8.0", "x64"), (dotnet.Framework, dotnet.Version, dotnet.Architecture));
         Assert.Equal(".NET Desktop Runtime 8.0 (x64)", dotnet.Name);
+        // .NET 7 and later do not run on Windows 7.
+        var windows = Assert.Single(prerequisites, p => p.Kind == PrerequisiteKind.Windows);
+        Assert.Equal(("10.0", "Windows 10 or later"), (windows.Version, windows.Name));
+    }
+
+    [Fact]
+    public void DotNet6StillRunsOnWindows7()
+    {
+        _files.Add($@"{App}\App.runtimeconfig.json",
+            """{ "runtimeOptions": { "framework": { "name": "Microsoft.NETCore.App", "version": "6.0.36" } } }""");
+
+        Assert.Equal(PrerequisiteKind.DotNet, Assert.Single(Analyze()).Kind);
+    }
+
+    [Fact]
+    public void MinimumWindowsOfTheExecutables()
+    {
+        _files
+            .Add($@"{App}\old.exe", PeBuilder.Build(PeInfo.MachineX64, ["kernel32.dll"], subsystem: new Version(6, 0)))
+            .Add($@"{App}\new.exe", PeBuilder.Build(PeInfo.MachineX64, ["kernel32.dll"], subsystem: new Version(6, 2)))
+            .Add($@"{App}\newer.dll", PeBuilder.Build(PeInfo.MachineX64, ["kernel32.dll"], subsystem: new Version(10, 0)));
+
+        var windows = Assert.Single(Analyze());
+        Assert.Equal((PrerequisiteKind.Windows, "6.2", "Windows 8 or later"), (windows.Kind, windows.Version, windows.Name));
+        Assert.Equal("new.exe is made for Windows 8 and later", windows.Reason);
+    }
+
+    [Fact]
+    public void UniversalCrt()
+    {
+        _files
+            .Add($@"{App}\app.exe", PeBuilder.Build(PeInfo.MachineX64, ["kernel32.dll", "api-ms-win-crt-runtime-l1-1-0.dll", "api-ms-win-crt-heap-l1-1-0.dll"]))
+            .Add($@"{App}\x86\tool.exe", PeBuilder.Build(PeInfo.MachineX86, ["ucrtbase.dll"]));
+
+        var crts = Analyze();
+        Assert.All(crts, p => Assert.Equal(PrerequisiteKind.UniversalCrt, p.Kind));
+        Assert.Equal(["x64", "x86"], crts.Select(p => p.Architecture).Order());
     }
 
     [Fact]
@@ -165,5 +209,38 @@ public class PrerequisiteCheckerTests
         Assert.True(_checker.IsInstalled(Of(PrerequisiteKind.NetFramework, version: "v4.0.30319")));
         Assert.False(_checker.IsInstalled(Of(PrerequisiteKind.NetFramework, version: "v2.0.50727")));
         Assert.True(_checker.IsInstalled(Of(PrerequisiteKind.WebView2)));
+    }
+
+    [Fact]
+    public void WindowsVersionOnWindows7()
+    {
+        Assert.Null(_checker.IsInstalled(Of(PrerequisiteKind.Windows, version: "6.2")));
+
+        _registry.Set(RegHive.LocalMachine, @"SOFTWARE\Microsoft\Windows NT\CurrentVersion", RegValue.String("CurrentVersion", "6.1"));
+
+        Assert.True(_checker.IsInstalled(Of(PrerequisiteKind.Windows, version: "6.1")));
+        Assert.False(_checker.IsInstalled(Of(PrerequisiteKind.Windows, version: "6.2")));
+        Assert.False(_checker.IsInstalled(Of(PrerequisiteKind.Windows, version: "10.0")));
+    }
+
+    [Fact]
+    public void WindowsVersionOnWindows10()
+    {
+        // CurrentVersion stays "6.3" on Windows 10 and 11.
+        _registry
+            .Set(RegHive.LocalMachine, @"SOFTWARE\Microsoft\Windows NT\CurrentVersion", RegValue.String("CurrentVersion", "6.3"))
+            .Set(RegHive.LocalMachine, @"SOFTWARE\Microsoft\Windows NT\CurrentVersion", RegValue.DWord("CurrentMajorVersionNumber", 10))
+            .Set(RegHive.LocalMachine, @"SOFTWARE\Microsoft\Windows NT\CurrentVersion", RegValue.DWord("CurrentMinorVersionNumber", 0));
+
+        Assert.True(_checker.IsInstalled(Of(PrerequisiteKind.Windows, version: "10.0")));
+    }
+
+    [Fact]
+    public void UniversalCrt()
+    {
+        _files.Add(@"C:\Windows\System32\ucrtbase.dll");
+
+        Assert.True(_checker.IsInstalled(Of(PrerequisiteKind.UniversalCrt, "x64")));
+        Assert.False(_checker.IsInstalled(Of(PrerequisiteKind.UniversalCrt, "x86")));
     }
 }

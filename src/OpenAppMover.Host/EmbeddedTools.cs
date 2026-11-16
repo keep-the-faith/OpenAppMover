@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 
 namespace OpenAppMover.Host;
 
@@ -18,7 +17,7 @@ internal static class EmbeddedTools
                              ?? throw new InvalidDataException($"{resourceName} is not embedded in this build of OpenAppMover.");
         var bytes = new byte[resource.Length];
         resource.ReadExactly(bytes);
-        var hash = Convert.ToHexString(SHA256.HashData(bytes));
+        var hash = Portable.ToHexString(Portable.Sha256(bytes));
 
         var tools = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "OpenAppMover", "tools");
         var path = Path.Combine(tools, relativePath(hash[..12].ToLowerInvariant()));
@@ -35,6 +34,6 @@ internal static class EmbeddedTools
     private static bool HashEquals(string path, string expected)
     {
         using var stream = File.OpenRead(path);
-        return Convert.ToHexString(SHA256.HashData(stream)) == expected;
+        return Portable.ToHexString(Portable.Sha256(stream)) == expected;
     }
 }

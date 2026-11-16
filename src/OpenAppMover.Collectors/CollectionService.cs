@@ -38,6 +38,7 @@ public sealed class CollectionService(
         new HeuristicDataCollector(),
         new ServiceCollector(),
         new ScheduledTaskCollector(),
+        new ShellExtensionCollector(),
     ];
 
     private readonly IReadOnlyList<ICollector> _collectors = collectors ?? DefaultCollectors;

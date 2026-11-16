@@ -31,7 +31,7 @@ public static class TextCodec
             }
             catch (DecoderFallbackException)
             {
-                decoded = new DecodedText(Encoding.Latin1.GetString(bytes), Encoding.Latin1, false);
+                decoded = new DecodedText(Portable.Latin1.GetString(bytes), Portable.Latin1, false);
             }
         }
         return decoded.Text.Contains('\0') ? null : decoded;

@@ -30,7 +30,7 @@ public sealed class WindowsServiceManager : IServiceManager
     {
         using var scm = OpenManager();
         // Dependencies: double null-terminated list.
-        var dependencies = spec.Dependencies.Length == 0 ? null : string.Join('\0', spec.Dependencies) + "\0\0";
+        var dependencies = spec.Dependencies.Length == 0 ? null : string.Join("\0", spec.Dependencies) + "\0\0";
         var service = CreateService(scm.Handle, spec.Name, spec.DisplayName ?? spec.Name, ServiceAllAccess, spec.Type, spec.Start,
             spec.ErrorControl, spec.ImagePath, null, IntPtr.Zero, dependencies, spec.Account, null);
         if (service == IntPtr.Zero)

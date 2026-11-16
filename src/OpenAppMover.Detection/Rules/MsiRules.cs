@@ -48,8 +48,13 @@ public sealed partial class MsiRule : IDetectionRule
         return candidate.NullIfEmpty();
     }
 
+#if NET7_0_OR_GREATER
     [GeneratedRegex(@"\{[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}\}")]
     private static partial Regex GuidPattern();
+#else
+    private static Regex? _guidPattern;
+    private static Regex GuidPattern() => _guidPattern ??= new(@"\{[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}\}");
+#endif
 }
 
 /// <summary>WiX Burn bundle (setup.exe chaining one or more MSI/EXE packages).</summary>

@@ -11,6 +11,7 @@ public sealed class ShortcutCollector : ICollector
     private const int MaxShortcutSize = 1024 * 1024;
 
     public string Name => "Shortcuts";
+    public CollectionPhase Phase => CollectionPhase.Main;
 
     public IEnumerable<CollectedItem> Collect(CollectionContext context)
     {

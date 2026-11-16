@@ -6,6 +6,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-16
+
+### Added
+- Windows 7 SP1 and 8.1 support (not 8.0, where .NET Framework 4.8 cannot be installed): `openappmover-legacy.exe` and `openappmover-gui-legacy.exe` (.NET Framework 4.8, with
+  their `.exe.config`), next to the .NET 8 executables for Windows 10 and 11.
+- Prerequisites: minimum Windows version of the application (executables made for Windows 8 and later, .NET 7 and
+  later) and Universal C Runtime, checked before deploying.
+- Scheduled tasks exported from Windows 8 and later are adapted to the Windows 7 schema when deployed there.
+
+### Changed
+- The embedded 7-Zip is built with the MinGW-w64 GCC of Debian and links with `msvcrt.dll` (no Universal C Runtime),
+  so that it runs on Windows 7.
+- Executables signed with SHA-1 and SHA-256 (dual signature), for Windows 7 without KB4474419.
+
+### Fixed
+- Explorer shell extensions (context menu, drag and drop, icon overlay, preview and thumbnail handlers) are collected
+  with their COM class: the context menu of applications such as 7-Zip was not restored.
+
+### Known limitations
+- Windows 7: no usage recording (dynamic analysis), which needs Windows 8 or later.
+
 ## [1.0.0] - 2026-11-14
 
 First version. Validated on Windows 10 (22H2): applications of every supported installer type were exported and

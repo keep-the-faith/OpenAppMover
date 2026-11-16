@@ -14,6 +14,9 @@ namespace OpenAppMover.Host;
 /// </summary>
 public sealed class EtwUsageTracer(ILogger logger) : IUsageTracer
 {
+    /// <summary>Windows 8: the KernelTraceControl.dll of TraceEvent (x64) uses API sets missing on Windows 7.</summary>
+    public static readonly Version MinimumWindows = new(6, 2);
+
     public IUsageTraceSession Start(string appId, IReadOnlyList<string> installRoots, string? launch) =>
         new Session(appId, installRoots, launch, logger);
 
@@ -37,6 +40,8 @@ public sealed class EtwUsageTracer(ILogger logger) : IUsageTracer
             _roots = installRoots;
             _logger = logger;
 
+            if (Environment.OSVersion.Version < MinimumWindows)
+                throw new PlatformNotSupportedException("Usage tracing needs Windows 8 or later.");
             KernelTraceControlLoader.EnsureLoaded();
             _session = new TraceEventSession(KernelTraceEventParser.KernelSessionName) { StopOnDispose = true };
             _session.EnableKernelProvider(

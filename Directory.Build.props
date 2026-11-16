@@ -1,15 +1,32 @@
 <Project>
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <!-- net8.0: Windows 10/11 build. net48: legacy build, Windows 7 SP1 and 8.1 (.NET Framework 4.8, see README). -->
+    <TargetFrameworks>net8.0;net48</TargetFrameworks>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
-    <Version>1.0.0</Version>
+    <Version>1.1.0</Version>
     <Product>OpenAppMover</Product>
     <Company>Keep The Faith</Company>
     <Copyright>Copyright (c) 2026 Keep The Faith. MIT License.</Copyright>
     <DebugType>embedded</DebugType>
   </PropertyGroup>
+  <PropertyGroup Condition="$(TargetFramework.StartsWith('net4'))">
+    <!-- SupportedOSPlatform & co. are excluded by default. -->
+    <PolySharpIncludeRuntimeSupportedAttributes>true</PolySharpIncludeRuntimeSupportedAttributes>
+    <!-- .NET Framework is not annotated for nullability: the net8.0 build does the checks. -->
+    <Nullable>annotations</Nullable>
+  </PropertyGroup>
+  <!-- .NET Framework 4.8: reference assemblies (build outside Windows) and back-ports of the newer APIs used by the code
+       (the others are in src/OpenAppMover.Core/Compat). -->
+  <ItemGroup Condition="'$(TargetFrameworkIdentifier)' == '.NETFramework'">
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" PrivateAssets="all" />
+    <PackageReference Include="PolySharp" PrivateAssets="all" />
+    <PackageReference Include="System.Memory" />
+    <PackageReference Include="System.Text.Json" />
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.IO.Compression.FileSystem" />
+  </ItemGroup>
 </Project>

@@ -138,9 +138,9 @@ internal sealed partial class Commands
     private Dictionary<int, string>? MapUsers(string? option, IReadOnlyList<PackageUser> sourceUsers, IReadOnlyList<UserProfile> profiles)
     {
         var map = _host.DefaultUserMap(sourceUsers, profiles);
-        foreach (var pair in (option ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        foreach (var pair in Portable.SplitTrimmed(option ?? "", ',', removeEmpty: true))
         {
-            var parts = pair.Split('=', 2, StringSplitOptions.TrimEntries);
+            var parts = Portable.SplitTrimmed(pair, '=', count: 2);
             if (parts.Length != 2 || !int.TryParse(parts[0], out var index) || sourceUsers.All(u => u.Index != index))
             {
                 Console.Error.WriteLine($"Invalid user mapping '{pair}' (expected <source index>=<user name|SID>, see the package users).");

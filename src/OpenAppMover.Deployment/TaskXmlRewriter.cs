@@ -23,4 +23,30 @@ public static class TaskXmlRewriter
         }
         return document.ToString();
     }
+
+    /// <summary>Windows 7 Task Scheduler: schema 1.3 at most (Windows 8 and later export 1.4).</summary>
+    private static readonly Version Windows7Schema = new(1, 3);
+
+    /// <summary>Settings added after schema 1.3: unknown to Windows 7, which refuses the whole definition.</summary>
+    private static readonly string[] PostWindows7Settings =
+        ["UseUnifiedSchedulingEngine", "DisallowStartOnRemoteAppSession", "Volatile", "MaintenanceSettings"];
+
+    /// <summary>
+    /// Makes a task exported from a newer Windows registrable on Windows 7 (before 6.2): schema version 1.3, settings it
+    /// does not know removed. Unchanged on later versions.
+    /// </summary>
+    public static string AdaptToWindows(string xml, Version windows)
+    {
+        if (windows >= new Version(6, 2))
+            return xml;
+        var document = XDocument.Parse(xml);
+        var root = document.Root;
+        if (root?.Attribute("version") is { } attribute && Version.TryParse(attribute.Value, out var version) && version > Windows7Schema)
+            attribute.Value = Windows7Schema.ToString();
+        document.Descendants()
+            .Where(e => e.Parent?.Name.LocalName == "Settings" && PostWindows7Settings.Contains(e.Name.LocalName))
+            .ToList()
+            .ForEach(e => e.Remove());
+        return document.ToString();
+    }
 }

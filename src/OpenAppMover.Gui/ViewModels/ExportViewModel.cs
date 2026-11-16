@@ -224,8 +224,10 @@ public sealed partial class ExportViewModel : PageViewModel, IDisposable
 
     private bool IsNotRecording() => !IsRecording;
 
+    private bool CanRecord() => !IsRecording && OpenAppMoverHost.UsageTraceSupported;
+
     /// <summary>Starts recording what the application reads and writes while the user works with it.</summary>
-    [RelayCommand(CanExecute = nameof(IsNotRecording))]
+    [RelayCommand(CanExecute = nameof(CanRecord))]
     private void RecordUsage()
     {
         if (_app is null || _collection is null || _session is null)

@@ -20,7 +20,7 @@ if (cli.Command is null or "help" || cli.Has("help"))
     Commands.PrintHelp();
     return cli.Command is null && !cli.Has("help") ? ExitCodes.Usage : ExitCodes.Ok;
 }
-if (!OperatingSystem.IsWindows())
+if (Environment.OSVersion.Platform != PlatformID.Win32NT)
 {
     Console.Error.WriteLine("OpenAppMover only runs on Windows.");
     return ExitCodes.Error;
@@ -39,7 +39,7 @@ Log.Logger = new LoggerConfiguration()
 
 using var loggerFactory = LoggerFactory.Create(builder => builder.AddSerilog(dispose: true));
 var logger = loggerFactory.CreateLogger("OpenAppMover");
-logger.LogInformation("OpenAppMover started: {Args}", string.Join(' ', args));
+logger.LogInformation("OpenAppMover started: {Args}", string.Join(" ", args));
 
 if (!Privileges.IsElevated())
     logger.LogWarning("Not running as administrator: some installations or user hives may be unreadable.");

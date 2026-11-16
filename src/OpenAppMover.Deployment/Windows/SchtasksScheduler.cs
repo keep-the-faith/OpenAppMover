@@ -12,6 +12,7 @@ public sealed class SchtasksScheduler : ITaskScheduler
 
     public void Register(string name, string xml)
     {
+        xml = TaskXmlRewriter.AdaptToWindows(xml, Environment.OSVersion.Version);
         // schtasks expects a UTF-16 file.
         var file = Path.Combine(Path.GetTempPath(), $"openappmover-task-{Guid.NewGuid():N}.xml");
         File.WriteAllText(file, "<?xml version=\"1.0\" encoding=\"UTF-16\"?>\r\n" + xml, Encoding.Unicode);
@@ -43,8 +44,7 @@ public sealed class SchtasksScheduler : ITaskScheduler
             UseShellExecute = false,
             CreateNoWindow = true,
         };
-        foreach (var argument in arguments)
-            info.ArgumentList.Add(argument);
+        Portable.AddArguments(info, arguments);
 
         using var process = Process.Start(info) ?? throw new InvalidOperationException("Cannot start schtasks.exe");
         var output = process.StandardOutput.ReadToEndAsync();

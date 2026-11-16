@@ -20,7 +20,7 @@ public sealed partial record MsiKeyPath(MsiKeyPathKind Kind, string? Path = null
         if (string.IsNullOrWhiteSpace(raw))
             return new MsiKeyPath(MsiKeyPathKind.None);
 
-        if (raw.Length >= 3 && char.IsAsciiDigit(raw[0]) && char.IsAsciiDigit(raw[1]) && raw[2] == ':')
+        if (raw.Length >= 3 && Portable.IsAsciiDigit(raw[0]) && Portable.IsAsciiDigit(raw[1]) && raw[2] == ':')
         {
             var path = raw[3..].TrimStart('\\');
             var separator = path.LastIndexOf('\\');
@@ -38,7 +38,7 @@ public sealed partial record MsiKeyPath(MsiKeyPathKind Kind, string? Path = null
         // Only real paths are files or folders. Others are not on the disk, e.g. "C?\…" (runs from the source media)
         // or "<\Name,version=…" (assembly in the GAC or WinSxS, managed by Windows).
         var isPath = raw.StartsWith(@"\\", StringComparison.Ordinal)
-            || (raw.Length >= 3 && char.IsAsciiLetter(raw[0]) && raw[1] == ':' && raw[2] == '\\');
+            || (raw.Length >= 3 && Portable.IsAsciiLetter(raw[0]) && raw[1] == ':' && raw[2] == '\\');
         if (!isPath)
             return new MsiKeyPath(MsiKeyPathKind.None);
         // "C:\?Windows\system32\msvcr120.dll": some key files are stored with a '?' after the root (undocumented;
@@ -56,8 +56,13 @@ public sealed partial record MsiKeyPath(MsiKeyPathKind Kind, string? Path = null
         return new MsiKeyPath(MsiKeyPathKind.Registry, key, code % 20, code >= 20, valueName);
     }
 
+#if NET7_0_OR_GREATER
     [GeneratedRegex(@"^\d\d\*(\d+)\*(\\.*)$", RegexOptions.Singleline)]
     private static partial Regex OffsetRegistryPath();
+#else
+    private static Regex? _offsetRegistryPath;
+    private static Regex OffsetRegistryPath() => _offsetRegistryPath ??= new(@"^\d\d\*(\d+)\*(\\.*)$", RegexOptions.Singleline);
+#endif
 }
 
 /// <summary>An installed component of a product.</summary>

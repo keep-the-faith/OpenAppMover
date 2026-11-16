@@ -1,5 +1,4 @@
 using System.IO.Compression;
-using System.Security.Cryptography;
 using System.Text.Json;
 using OpenAppMover.Packaging;
 
@@ -106,14 +105,14 @@ public sealed class PackageReader : IDisposable
             return false;
         if (path.StartsWith('{'))
             return path.IndexOf('}') > 1;
-        return (path.Length >= 3 && char.IsAsciiLetter(path[0]) && path[1] == ':' && path[2] == '\\')
+        return (path.Length >= 3 && Portable.IsAsciiLetter(path[0]) && path[1] == ':' && path[2] == '\\')
                || path.StartsWith(@"\\", StringComparison.Ordinal);
     }
 
     private static string Sha256(ZipArchiveEntry entry)
     {
         using var stream = entry.Open();
-        return Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant();
+        return Portable.ToHexString(Portable.Sha256(stream)).ToLowerInvariant();
     }
 
     private T? ReadJson<T>(string name)

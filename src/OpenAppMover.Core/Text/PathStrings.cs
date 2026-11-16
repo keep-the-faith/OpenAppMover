@@ -11,17 +11,22 @@ public static partial class PathStrings
     {
         var texts = new[]
         {
-            Encoding.Latin1.GetString(data),
+            Portable.Latin1.GetString(data),
             Encoding.Unicode.GetString(data, 0, data.Length & ~1),
             data.Length > 1 ? Encoding.Unicode.GetString(data, 1, (data.Length - 1) & ~1) : "",
         };
         return texts
-            .SelectMany(t => AbsolutePath().Matches(t).Select(m => m.Value.TrimEnd(' ', '.', '\\')))
+            .SelectMany(t => AbsolutePath().Matches(t).Cast<Match>().Select(m => m.Value.TrimEnd(' ', '.', '\\')))
             .Where(p => p.Length > 3)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
     }
 
+#if NET7_0_OR_GREATER
     [GeneratedRegex(@"(?<![A-Za-z])[A-Za-z]:\\[^\x00-\x1F""*?<>|�]{2,259}")]
     private static partial Regex AbsolutePath();
+#else
+    private static Regex? _absolutePath;
+    private static Regex AbsolutePath() => _absolutePath ??= new(@"(?<![A-Za-z])[A-Za-z]:\\[^\x00-\x1F""*?<>|�]{2,259}");
+#endif
 }

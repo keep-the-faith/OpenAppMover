@@ -16,9 +16,34 @@ failure and a clean uninstallation.
 
 ## Requirements
 
-- Windows 10 or 11, x64, on both machines.
-- Administrator rights (both executables request elevation).
-- Nothing to install: `openappmover.exe` (command line) and `openappmover-gui.exe` (graphical interface) are self-contained.
+- Windows x64, on both machines, with administrator rights (the executables request elevation).
+- Two builds of the same application:
+
+| Windows | Executables | Needs |
+|---|---|---|
+| 10, 11 | `openappmover.exe` (command line), `openappmover-gui.exe` (graphical interface) | nothing: self-contained .NET 8 |
+| 7 SP1, 8.1 (and later) | `openappmover-legacy.exe`, `openappmover-gui-legacy.exe`, each with its `.exe.config` | .NET Framework 4.8 |
+
+Windows 8 (8.0) is not supported: .NET Framework 4.8 cannot be installed there (free upgrade to Windows 8.1).
+
+On Windows 7, keep the `.exe.config` file next to its executable: without .NET Framework 4.8, Windows then offers to
+install it. Recommended updates there: KB4474419 (SHA-2 code signing; the executables are also signed with SHA-1) and,
+for applications built with Visual C++ 2015 or later, KB2999226 (Universal C Runtime).
+
+If the .NET Framework 4.8 installer (use the offline one, `ndp48-x86-x64-allos-enu.exe`) fails on Windows 7 SP1:
+- *"A certificate chain processed, but terminated in a root certificate which is not trusted"*: import the Microsoft
+  Root Certificate Authority 2011 (`MicRooCerAut2011_2011_03_22.crt`, from `http://www.microsoft.com/pki/certs/`) into
+  the machine's trusted roots: `certutil -addstore root MicRooCerAut2011_2011_03_22.crt` (elevated prompt).
+- *"The timestamp signature and/or certificate could not be verified or is malformed"*: install KB4490628 (servicing
+  stack), then KB4474419 (SHA-2), reboot; if it persists, also import `MicRooCerAut_2010-06-23.crt` the same way and
+  check the system date.
+
+Windows 7 limitations:
+- **Record usage** (dynamic analysis) is not available: it needs Windows 8 or later.
+- Scheduled tasks exported from Windows 8 and later are registered with the Windows 7 schema (settings it does not know
+  are removed).
+- Before deploying, the preview reports the applications that cannot run there: executables made for Windows 8 and
+  later, .NET 7 and later, missing Universal C Runtime.
 
 ## Graphical interface
 
@@ -84,7 +109,7 @@ Inno Setup, NSIS, InstallShield, Squirrel, ClickOnce (not transferable).
 | Inno Setup | the uninstall log `unins000.dat` |
 | NSIS | the script of the uninstaller, decompiled by the embedded 7-Zip |
 | InstallShield, Wise, custom installers | paths listed in their logs (`setup.ilg`, `install.log`…) |
-| System | shortcuts, services and drivers, scheduled tasks, Run keys, App Paths, environment variables (PATH entries only), firewall rules, event log sources, COM classes, ProgIDs, URL protocols and file associations |
+| System | shortcuts, services and drivers, scheduled tasks, Run keys, App Paths, environment variables (PATH entries only), firewall rules, event log sources, COM classes and Explorer shell extensions (context menus…), ProgIDs, URL protocols and file associations |
 | Heuristic | data and settings named after the application or its publisher (AppData, ProgramData, Documents, `Software\Vendor\Product`, UAC VirtualStore) |
 | Dynamic analysis (optional) | what the application actually reads and writes while you use it |
 
@@ -118,6 +143,7 @@ missing prerequisites, driver and firewall warnings.
 
 `openappmover trace <app> [--launch]` (or **Record usage…** in the interface) follows the application's processes with a
 kernel ETW session while you use it, then `collect`/`export --trace` adds the data folders and settings keys it used.
+It needs Windows 8 or later.
 
 ## Known limitations
 
@@ -134,10 +160,18 @@ kernel ETW session while you use it, then `collect`/`export --trace` adds the da
 ./build.sh
 ```
 
-Builds, runs the tests and publishes `dist/openappmover.exe`, `dist/openappmover-gui.exe`, the license and the third-party notices. It runs on
-Linux or Windows; the .NET 8 SDK and the NuGet packages are installed in `.build/` when missing.
+Builds, runs the tests and publishes into `dist/` the four executables (see *Requirements*), the license and the
+third-party notices. It runs on Linux or Windows; the .NET 8 SDK and the NuGet packages are installed in `.build/` when
+missing. The .NET Framework 4.8 tests run on Windows, and elsewhere with Mono when it is installed (xUnit console
+runner fetched into `.build/`); without Mono they are skipped (the CI runs them).
 
-`third_party/7-Zip/7zz.exe` is produced by `tools/build-7zip.sh` (see below); the executables embed it.
+Every library targets `net8.0` and `net48`. The .NET 8 APIs missing from .NET Framework are in
+`src/OpenAppMover.Core/Compat`: `Portable` (static methods, both targets) and extension methods with the .NET 8
+signatures (.NET Framework only). The legacy executables (Windows 7 SP1 and 8.1) merge their dependencies with Costura.Fody.
+
+`third_party/7-Zip/7zz.exe` is produced by `tools/build-7zip.sh` (see below); the executables embed it. It is built with
+the MinGW-w64 GCC of Debian (extracted into `.build/`, no root needed) and links with `msvcrt.dll`, so that it runs on
+Windows 7.
 
 The application icon `src/OpenAppMover.Gui/Assets/openappmover.ico` is generated by `tools/build-icon.sh` from
 `openappmover.svg` (32 px and larger) and `openappmover-small.svg` (16 to 24 px, drawn on a 16-pixel grid); run it after
@@ -149,18 +183,19 @@ The GitHub Actions workflow (`.github/workflows/build.yml`) builds and tests eve
 the executables as a workflow artifact. Pushing a tag `v<version>` also publishes the GitHub Release:
 
 ```
-git tag v1.0.0
-git push origin v1.0.0
+git tag v1.1.0
+git push origin v1.1.0
 ```
 
 The tag must match `<Version>` in `Directory.Build.props`, and `CHANGELOG.md` must have a section for that version: it
-becomes the release notes. The release holds `openappmover.exe`, `openappmover-gui.exe` and a zip with both, the license and the
+becomes the release notes. The release holds the four executables (with the `.exe.config` of the legacy ones) and a zip with them, the license and the
 third-party notices, attached a few minutes after the tag is pushed (when the workflow ends; a release drafted on the
 GitHub page with a new tag gets them too). A version with a suffix (`1.1.0-beta.1`) is published as a pre-release. Releases are not signed.
 
 ### Signing
 
-The executables and the embedded 7-Zip are signed (Authenticode, SHA-256, timestamped) when `SIGN_PFX` is set:
+The executables and the embedded 7-Zip are signed (Authenticode, timestamped) when `SIGN_PFX` is set: a SHA-1 signature
+and a nested SHA-256 one, since Windows 7 without KB4474419 only checks the first (`SIGN_SHA1=0`: SHA-256 only).
 
 ```
 tools/make-test-cert.sh   # once: self-signed test certificate in .build/signing
@@ -175,7 +210,8 @@ SIGN_PFX=.build/signing/openappmover-test.pfx SIGN_PASSWORD_FILE=.build/signing/
 does the same:
 
 ```
-signtool sign /fd SHA256 /f openappmover.pfx /p <password> /tr http://timestamp.digicert.com /td SHA256 dist\openappmover.exe dist\openappmover-gui.exe
+signtool sign /fd SHA1 /f openappmover.pfx /p <password> /tr http://timestamp.digicert.com /td SHA1 dist\*.exe
+signtool sign /as /fd SHA256 /f openappmover.pfx /p <password> /tr http://timestamp.digicert.com /td SHA256 dist\*.exe
 ```
 
 A self-signed certificate is trusted only on the PCs where it is installed. On each test PC, in an administrator

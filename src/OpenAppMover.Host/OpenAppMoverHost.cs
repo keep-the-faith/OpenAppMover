@@ -43,7 +43,7 @@ public sealed class OpenAppMoverHost(ILoggerFactory loggerFactory)
     /// </summary>
     public static string InstalledExecutable =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "OpenAppMover",
-            Path.GetFileName(Environment.ProcessPath) ?? "openappmover.exe");
+            Path.GetFileName(Portable.ProcessPath) ?? "openappmover.exe");
 
     public DeploymentStore Store => new(Files, DeploymentsRoot);
 
@@ -118,6 +118,9 @@ public sealed class OpenAppMoverHost(ILoggerFactory loggerFactory)
     /// Starts recording what the application reads and writes (kernel ETW trace). Its running processes are followed;
     /// with <paramref name="launch"/>, its main executable is started too.
     /// </summary>
+    /// <summary>False on Windows 7: the kernel trace needs Windows 8 or later (see EtwUsageTracer).</summary>
+    public static bool UsageTraceSupported => Environment.OSVersion.Version >= EtwUsageTracer.MinimumWindows;
+
     public IUsageTraceSession StartUsageTrace(InstalledApp app, CollectionResult collection, bool launch) =>
         new EtwUsageTracer(_logger).Start(app.Id, collection.InstallRoots.Select(r => r.Path).ToList(), launch ? MainExecutable(app, collection) : null);
 
@@ -219,7 +222,7 @@ public sealed class OpenAppMoverHost(ILoggerFactory loggerFactory)
     /// <summary>Copies OpenAppMover to Program Files so that the uninstall entries keep working.</summary>
     private void InstallSelf()
     {
-        var current = Environment.ProcessPath;
+        var current = Portable.ProcessPath;
         if (current is null || string.Equals(Path.GetFullPath(current), InstalledExecutable, StringComparison.OrdinalIgnoreCase))
             return;
         try

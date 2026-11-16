@@ -28,8 +28,24 @@ public sealed class PrerequisiteChecker(IRegistrySource registry, IFileSystem fi
             : NumberValue(@"SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full", "Release") is not null,
         PrerequisiteKind.DotNet => DotNetInstalled(prerequisite),
         PrerequisiteKind.WebView2 => WebView2Installed(),
+        PrerequisiteKind.Windows => Version.TryParse(prerequisite.Version, out var minimum) && WindowsVersion() is { } windows
+            ? windows >= minimum
+            : null,
+        PrerequisiteKind.UniversalCrt => SystemFileExists("ucrtbase.dll", prerequisite.Architecture),
         _ => null,
     };
+
+    /// <summary>
+    /// Version of this Windows (major.minor). CurrentVersion stays "6.3" on Windows 10 and later, which have
+    /// CurrentMajorVersionNumber.
+    /// </summary>
+    private Version? WindowsVersion()
+    {
+        using var key = registry.OpenKey(RegHive.LocalMachine, RegView.Registry64, @"SOFTWARE\Microsoft\Windows NT\CurrentVersion");
+        if (key?.GetValue("CurrentMajorVersionNumber")?.AsNumber() is { } major)
+            return new Version((int)major, (int)(key.GetValue("CurrentMinorVersionNumber")?.AsNumber() ?? 0));
+        return Version.TryParse(key?.GetString("CurrentVersion"), out var version) ? version : null;
+    }
 
     /// <summary>32-bit DLLs live in SysWOW64 on 64-bit Windows.</summary>
     private bool SystemFileExists(string fileName, string? architecture) =>

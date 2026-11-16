@@ -137,7 +137,7 @@ public static class InnoUninstallLog
             }
             else
             {
-                strings.Add(Encoding.Latin1.GetString(data.Slice(pos, length)));
+                strings.Add(Portable.Latin1.GetString(data.Slice(pos, length)));
                 pos += length;
             }
         }
@@ -149,12 +149,12 @@ public static class InnoUninstallLog
     {
         var end = field.IndexOf((byte)0);
         var bytes = end < 0 ? field : field[..end];
-        return bytes.Length > 0 && bytes[0] == 1 ? Encoding.UTF8.GetString(bytes[1..]) : Encoding.Latin1.GetString(bytes);
+        return bytes.Length > 0 && bytes[0] == 1 ? Encoding.UTF8.GetString(bytes[1..]) : Portable.Latin1.GetString(bytes);
     }
 
     private static string ReadAnsi(ReadOnlySpan<byte> field)
     {
         var end = field.IndexOf((byte)0);
-        return Encoding.Latin1.GetString(end < 0 ? field : field[..end]);
+        return Portable.Latin1.GetString(end < 0 ? field : field[..end]);
     }
 }

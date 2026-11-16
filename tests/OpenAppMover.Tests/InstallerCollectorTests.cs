@@ -309,7 +309,8 @@ public class BurnBundleCollectorTests
             _machine.Registry.Set(RegHive.LocalMachine, $@"{userData}\Products\{packed}\InstallProperties");
             foreach (var file in files)
             {
-                var component = $"{{B0000000-0000-0000-0000-{++componentCount:D12}}}";
+                // No "{x:D12}}}": .NET Framework reads the "}}" as part of the format specifier.
+                var component = "{B0000000-0000-0000-0000-" + (++componentCount).ToString("D12") + "}";
                 _machine.Registry.Set(RegHive.LocalMachine, $@"{userData}\Components\{MsiGuid.Pack(component)}", RegValue.String(packed, file));
                 _machine.Files.Add(file);
             }

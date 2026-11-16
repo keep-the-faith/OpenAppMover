@@ -113,7 +113,7 @@ public static partial class InstallRootResolver
         var count = 0;
         while (count < left.Length && count < right.Length && left[count].Equals(right[count], StringComparison.OrdinalIgnoreCase))
             count++;
-        return count == 0 ? null : WinPath.Normalize(string.Join('\\', left[..count]));
+        return count == 0 ? null : WinPath.Normalize(string.Join("\\", left.Take(count)));
     }
 
     /// <summary>Rejects missing folders and folders that are too broad (drive root, Program Files, a user profile…).</summary>
@@ -128,6 +128,11 @@ public static partial class InstallRootResolver
     /// <summary>"C:\App\app.exe,0" → "C:\App\app.exe".</summary>
     public static string StripIconIndex(string icon) => IconIndex().Replace(icon.Trim().Trim('"'), "").Trim('"');
 
+#if NET7_0_OR_GREATER
     [GeneratedRegex(@",\s*-?\d+\s*$")]
     private static partial Regex IconIndex();
+#else
+    private static Regex? _iconIndex;
+    private static Regex IconIndex() => _iconIndex ??= new(@",\s*-?\d+\s*$");
+#endif
 }

@@ -220,7 +220,7 @@ public sealed class DeploymentExecutor(
 
     private static void CheckHash(IncrementalHash hash, Packaging.PackageFile file)
     {
-        if (!Convert.ToHexString(hash.GetHashAndReset()).Equals(file.Sha256, StringComparison.OrdinalIgnoreCase))
+        if (!Portable.ToHexString(hash.GetHashAndReset()).Equals(file.Sha256, StringComparison.OrdinalIgnoreCase))
             throw new InvalidDataException($"Corrupted file in the package (SHA-256 mismatch): {file.Path}");
     }
 
@@ -230,7 +230,7 @@ public sealed class DeploymentExecutor(
         var segments = location.Path.Split('\\', StringSplitOptions.RemoveEmptyEntries);
         for (var i = 1; i <= segments.Length; i++)
         {
-            var sub = location with { Path = string.Join('\\', segments[..i]) };
+            var sub = location with { Path = string.Join("\\", segments.Take(i)) };
             using var key = context.Target.OpenKey(registry, sub);
             if (key is not null)
                 continue;
@@ -289,7 +289,7 @@ public sealed class DeploymentExecutor(
         using (var key = context.Target.OpenKey(registry, op.Location))
             current = key?.GetValue(op.Variable);
         var text = current?.AsString() ?? "";
-        var entries = text.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var entries = Portable.SplitTrimmed(text, ';', removeEmpty: true);
         if (entries.Contains(op.Entry, StringComparer.OrdinalIgnoreCase))
             return;
 
@@ -352,7 +352,7 @@ public sealed class DeploymentExecutor(
             return false;
         using var streamA = files.OpenRead(a);
         using var streamB = files.OpenRead(b);
-        return SHA256.HashData(streamA).AsSpan().SequenceEqual(SHA256.HashData(streamB));
+        return Portable.Sha256(streamA).AsSpan().SequenceEqual(Portable.Sha256(streamB));
     }
 
     private void Undo(UndoRecord undo, CollectionSession target)
@@ -412,7 +412,7 @@ public sealed class DeploymentExecutor(
                 var entries = text.Split(';', StringSplitOptions.RemoveEmptyEntries)
                     .Where(e => !e.Trim().Equals(undo.Entry, StringComparison.OrdinalIgnoreCase));
                 var physical = Physical(undo.Registry!, target);
-                registryWriter.SetValue(physical.Hive, physical.View, physical.Path, current with { Text = string.Join(';', entries) });
+                registryWriter.SetValue(physical.Hive, physical.View, physical.Path, current with { Text = string.Join(";", entries) });
                 break;
             }
         }

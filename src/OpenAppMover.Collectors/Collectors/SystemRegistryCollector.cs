@@ -18,6 +18,7 @@ public sealed class SystemRegistryCollector : ICollector
     private static readonly string[] ListVariables = ["Path", "PSModulePath", "CLASSPATH"];
 
     public string Name => "System registry";
+    public CollectionPhase Phase => CollectionPhase.Main;
 
     public IEnumerable<CollectedItem> Collect(CollectionContext context)
     {
@@ -87,7 +88,7 @@ public sealed class SystemRegistryCollector : ICollector
                 if (ListVariables.Contains(name, StringComparer.OrdinalIgnoreCase))
                 {
                     // Only the entries of the application, never the whole variable.
-                    foreach (var entry in value.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                    foreach (var entry in Portable.SplitTrimmed(value, ';', removeEmpty: true))
                     {
                         if (context.FindReferencedRoot(entry, scope.User) is { } root)
                             yield return Item(Name, ItemKind.PathEntry, ItemRole.Environment, Confidence.Certain,

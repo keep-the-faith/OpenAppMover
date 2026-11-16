@@ -34,8 +34,12 @@ public sealed class WpfDialogService : IDialogService
 
     public string? PickFolder(string title, string? initialFolder)
     {
+#if NETFRAMEWORK
+        return FolderPicker.Show(Owner, title, initialFolder);
+#else
         var dialog = new OpenFolderDialog { Title = title, InitialDirectory = initialFolder ?? "" };
         return dialog.ShowDialog(Owner) == true ? dialog.FolderName : null;
+#endif
     }
 
     public string? AskPassword(string title, string message)

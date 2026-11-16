@@ -18,6 +18,7 @@ public sealed class UsageTraceCollector : ICollector
     };
 
     public string Name => "Usage trace";
+    public CollectionPhase Phase => CollectionPhase.Main;
 
     public IEnumerable<CollectedItem> Collect(CollectionContext context)
     {
@@ -125,7 +126,7 @@ public sealed class UsageTraceCollector : ICollector
         if (parts.Length <= softwareIndex + 1 || !parts[softwareIndex].Equals("SOFTWARE", StringComparison.OrdinalIgnoreCase))
             return null;
 
-        var rest = parts[(softwareIndex + 1)..].ToList();
+        var rest = parts.Skip(softwareIndex + 1).ToList();
         var view = Core.Registry.RegView.Registry64;
         if (machine && rest[0].Equals("WOW6432Node", StringComparison.OrdinalIgnoreCase))
         {
@@ -135,7 +136,7 @@ public sealed class UsageTraceCollector : ICollector
         if (rest.Count == 0 || Noise.Contains(rest[0]))
             return null;
 
-        var key = (machine ? "SOFTWARE\\" : "Software\\") + string.Join('\\', rest.Take(2));
+        var key = (machine ? "SOFTWARE\\" : "Software\\") + string.Join("\\", rest.Take(2));
         return machine ? RegistryLocation.Machine(view, key) : RegistryLocation.User(sid!, key);
     }
 }

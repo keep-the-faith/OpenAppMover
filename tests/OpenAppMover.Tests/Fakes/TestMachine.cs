@@ -121,6 +121,13 @@ public sealed class TestMachine
             .Set(RegHive.LocalMachine, $@"{Classes}\CLSID\{ClsId}\InprocServer32", RegValue.String("", $@"{InstallDir}\shell.dll"))
             .Set(RegHive.LocalMachine, $@"{Classes}\CLSID\{ClsId}\ProgID", RegValue.String("", "Acme.Shell.1"))
             .Set(RegHive.LocalMachine, $@"{Classes}\Acme.Shell.1", RegValue.String("", "Acme shell extension"))
+            .Set(RegHive.LocalMachine, $@"{Classes}\*\shellex\ContextMenuHandlers\Acme", RegValue.String("", ClsId))
+            .Set(RegHive.LocalMachine, $@"{Classes}\*\shellex\ContextMenuHandlers\Other", RegValue.String("", "{99999999-9999-9999-9999-999999999999}"))
+            .Set(RegHive.LocalMachine, $@"{Classes}\Directory\Background\shellex\ContextMenuHandlers\Acme", RegValue.String("", ClsId))
+            .Set(RegHive.LocalMachine, $@"{Classes}\Drive\shellex\DragDropHandlers\{ClsId}")
+            .Set(RegHive.LocalMachine, $@"{Classes}\SystemFileAssociations\.acme\shellex\{{e357fccd-a995-4576-b01f-234630154e96}}", RegValue.String("", ClsId))
+            .Set(RegHive.LocalMachine, @"SOFTWARE\Microsoft\Windows\CurrentVersion\Shell Extensions\Approved",
+                RegValue.String(ClsId, "Acme shell extension"), RegValue.String("{99999999-9999-9999-9999-999999999999}", "Other"))
             .Set(RegHive.LocalMachine, $@"{Classes}\AcmeEditor.Document\shell\open\command", RegValue.String("", $"\"{InstallDir}\\editor.exe\" \"%1\""))
             .Set(RegHive.LocalMachine, $@"{Classes}\txtfile\shell\open\command", RegValue.String("", @"C:\Windows\notepad.exe ""%1"""))
             .Set(RegHive.LocalMachine, $@"{Classes}\.acme", RegValue.String("", "AcmeEditor.Document"))

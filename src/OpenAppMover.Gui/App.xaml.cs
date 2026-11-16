@@ -25,7 +25,7 @@ public partial class App
             .CreateLogger();
         _loggerFactory = LoggerFactory.Create(builder => builder.AddSerilog(dispose: true));
         var logger = _loggerFactory.CreateLogger("OpenAppMover.Gui");
-        logger.LogInformation("OpenAppMover GUI started: {Args}", string.Join(' ', e.Args));
+        logger.LogInformation("OpenAppMover GUI started: {Args}", string.Join(" ", e.Args));
 
         DispatcherUnhandledException += (_, args) =>
         {

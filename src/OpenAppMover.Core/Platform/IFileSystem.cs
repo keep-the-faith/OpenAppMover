@@ -48,6 +48,24 @@ public sealed class PhysicalFileSystem : IWritableFileSystem
 {
     private const int ChunkSize = 1024 * 1024;
 
+#if NETFRAMEWORK
+    // .NET Framework has no EnumerationOptions: links (that may point outside or loop) are filtered here, and "*.ext"
+    // is matched exactly (Win32 matching of 3-character extensions also returns "*.extX" files).
+    private static IEnumerable<string> EnumerateEntries(string path, string pattern, bool directories)
+    {
+        var directory = new DirectoryInfo(Long(path));
+        var entries = directories ? directory.EnumerateDirectories(pattern).Cast<FileSystemInfo>() : directory.EnumerateFiles(pattern);
+        var exactExtension = pattern.StartsWith("*.", StringComparison.Ordinal) && pattern.IndexOfAny(['*', '?'], 1) < 0
+            ? pattern.Substring(1) : null;
+        return entries
+            .Where(e => (e.Attributes & FileAttributes.ReparsePoint) == 0)
+            .Where(e => exactExtension is null || e.Name.EndsWith(exactExtension, StringComparison.OrdinalIgnoreCase))
+            .Select(e => Portable.WithoutExtendedPrefix(e.FullName));
+    }
+
+    /// <summary>Windows 7 has no long path support: beyond MAX_PATH, a path needs the \\?\ prefix.</summary>
+    private static string Long(string path) => Portable.WithExtendedPrefix(path);
+#else
     private static readonly EnumerationOptions Options = new()
     {
         RecurseSubdirectories = false,
@@ -56,16 +74,23 @@ public sealed class PhysicalFileSystem : IWritableFileSystem
         AttributesToSkip = FileAttributes.ReparsePoint,
     };
 
-    public bool FileExists(string path) => File.Exists(path);
+    private static IEnumerable<string> EnumerateEntries(string path, string pattern, bool directories) =>
+        directories ? Directory.EnumerateDirectories(path, pattern, Options) : Directory.EnumerateFiles(path, pattern, Options);
 
-    public bool DirectoryExists(string path) => Directory.Exists(path);
+    /// <summary>.NET adds the \\?\ prefix itself when needed.</summary>
+    private static string Long(string path) => path;
+#endif
+
+    public bool FileExists(string path) => File.Exists(Long(path));
+
+    public bool DirectoryExists(string path) => Directory.Exists(Long(path));
 
     public IEnumerable<string> EnumerateDirectories(string path) =>
-        Directory.Exists(path) ? Safe(() => Directory.EnumerateDirectories(path, "*", Options).ToList()) : [];
+        Directory.Exists(Long(path)) ? Safe(() => EnumerateEntries(path, "*", directories: true).ToList()) : [];
 
     public IEnumerable<string> EnumerateFiles(string path, string pattern = "*", bool recursive = false)
     {
-        if (!Directory.Exists(path))
+        if (!Directory.Exists(Long(path)))
             yield break;
 
         var pending = new Stack<string>();
@@ -73,7 +98,7 @@ public sealed class PhysicalFileSystem : IWritableFileSystem
         while (pending.Count > 0)
         {
             var dir = pending.Pop();
-            foreach (var file in Safe(() => Directory.EnumerateFiles(dir, pattern, Options).ToList()))
+            foreach (var file in Safe(() => EnumerateEntries(dir, pattern, directories: false).ToList()))
                 yield return file;
             if (recursive)
             {
@@ -85,45 +110,45 @@ public sealed class PhysicalFileSystem : IWritableFileSystem
 
     public FileMeta? GetFileMeta(string path)
     {
-        var info = new FileInfo(path);
+        var info = new FileInfo(Long(path));
         return info.Exists ? new FileMeta(info.Length, info.LastWriteTimeUtc, info.Attributes) : null;
     }
 
     public Stream OpenRead(string path) =>
-        new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, 81920, FileOptions.SequentialScan);
+        new FileStream(Long(path), FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, 81920, FileOptions.SequentialScan);
 
-    public void CreateDirectory(string path) => Directory.CreateDirectory(path);
+    public void CreateDirectory(string path) => Directory.CreateDirectory(Long(path));
 
     public Stream Create(string path)
     {
         ClearProtection(path);
-        return new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None, 81920);
+        return new FileStream(Long(path), FileMode.Create, FileAccess.Write, FileShare.None, 81920);
     }
 
     public void Copy(string source, string destination)
     {
         ClearProtection(destination);
-        File.Copy(source, destination, overwrite: true);
+        File.Copy(Long(source), Long(destination), overwrite: true);
     }
 
     public void DeleteFile(string path)
     {
         ClearProtection(path);
-        File.Delete(path);
+        File.Delete(Long(path));
     }
 
     public bool DeleteDirectory(string path)
     {
-        if (!Directory.Exists(path) || Directory.EnumerateFileSystemEntries(path).Any())
+        if (!Directory.Exists(Long(path)) || Directory.EnumerateFileSystemEntries(Long(path)).Any())
             return false;
-        Directory.Delete(path);
+        Directory.Delete(Long(path));
         return true;
     }
 
     public void SetMeta(string path, DateTime lastWriteUtc, FileAttributes attributes)
     {
-        File.SetLastWriteTimeUtc(path, lastWriteUtc);
-        File.SetAttributes(path, attributes);
+        File.SetLastWriteTimeUtc(Long(path), lastWriteUtc);
+        File.SetAttributes(Long(path), attributes);
     }
 
     public long? GetAvailableSpace(string path)
@@ -147,15 +172,15 @@ public sealed class PhysicalFileSystem : IWritableFileSystem
     /// </summary>
     private static void ClearProtection(string path)
     {
-        var info = new FileInfo(path);
+        var info = new FileInfo(Long(path));
         if (info.Exists && (info.Attributes & Protective) != 0)
             info.Attributes &= ~Protective;
     }
 
-    public IReadOnlySet<string> FindMarkers(string path, IReadOnlyCollection<string> markers, long maxBytes)
+    public ISet<string> FindMarkers(string path, IReadOnlyCollection<string> markers, long maxBytes)
     {
         var found = new HashSet<string>(StringComparer.Ordinal);
-        if (markers.Count == 0 || !File.Exists(path))
+        if (markers.Count == 0 || !File.Exists(Long(path)))
             return found;
 
         var patterns = markers
@@ -165,7 +190,7 @@ public sealed class PhysicalFileSystem : IWritableFileSystem
 
         try
         {
-            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, ChunkSize);
+            using var stream = new FileStream(Long(path), FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, ChunkSize);
             var buffer = new byte[ChunkSize + overlap];
             var kept = 0;
             long total = 0;

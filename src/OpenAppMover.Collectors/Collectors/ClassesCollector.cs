@@ -18,6 +18,7 @@ public sealed class ClassesCollector : ICollector
     };
 
     public string Name => "Classes";
+    public CollectionPhase Phase => CollectionPhase.Main;
 
     public IEnumerable<CollectedItem> Collect(CollectionContext context)
     {

@@ -17,6 +17,7 @@ public sealed class InnoSetupCollector : ICollector
     private const uint HkeyLocalMachine = 0x80000002;
 
     public string Name => "Inno Setup";
+    public CollectionPhase Phase => CollectionPhase.Main;
 
     public IEnumerable<CollectedItem> Collect(CollectionContext context)
     {

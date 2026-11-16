@@ -39,8 +39,8 @@ public static class PackageCrypto
         var header = new byte[HeaderSize];
         Magic.CopyTo(header, 0);
         BinaryPrimitives.WriteInt32LittleEndian(header.AsSpan(8), iterations);
-        RandomNumberGenerator.Fill(header.AsSpan(12, 16));   // salt
-        RandomNumberGenerator.Fill(header.AsSpan(28, 16));   // IV
+        Portable.FillRandom(header.AsSpan(12, 16));   // salt
+        Portable.FillRandom(header.AsSpan(28, 16));   // IV
         var (encryptionKey, macKey) = DeriveKeys(password, header.AsSpan(12, 16).ToArray(), iterations);
 
         using var mac = IncrementalHash.CreateHMAC(HashAlgorithmName.SHA256, macKey);
@@ -78,7 +78,7 @@ public static class PackageCrypto
             CopyTo(input, cipherLength, mac.AppendData);
             var expected = new byte[MacSize];
             input.ReadExactly(expected);
-            if (!CryptographicOperations.FixedTimeEquals(mac.GetHashAndReset(), expected))
+            if (!Portable.FixedTimeEquals(mac.GetHashAndReset(), expected))
                 throw new CryptographicException("Wrong password, or the package is corrupted.");
         }
 
@@ -95,8 +95,8 @@ public static class PackageCrypto
 
     private static (byte[] EncryptionKey, byte[] MacKey) DeriveKeys(string password, byte[] salt, int iterations)
     {
-        var keys = Rfc2898DeriveBytes.Pbkdf2(password, salt, iterations, HashAlgorithmName.SHA256, 64);
-        return (keys[..32], keys[32..]);
+        var keys = Portable.Pbkdf2(password, salt, iterations, HashAlgorithmName.SHA256, 64);
+        return (keys.AsSpan(0, 32).ToArray(), keys.AsSpan(32).ToArray());
     }
 
     private static void CopyTo(Stream input, long length, Action<byte[], int, int> write)
