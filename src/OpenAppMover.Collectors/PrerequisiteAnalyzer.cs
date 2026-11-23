@@ -2,13 +2,22 @@ using System.Text.Json;
 using OpenAppMover.Core.Models;
 using OpenAppMover.Core.Pe;
 using OpenAppMover.Core.Platform;
+using OpenAppMover.Core.Registry;
 using OpenAppMover.Core.Text;
 
 namespace OpenAppMover.Collectors;
 
-/// <summary>Finds the runtimes an application needs from the DLLs its executables import and its .NET configuration.</summary>
+/// <summary>A COM class registered on the source machine: its name and the file serving it (environment expanded).</summary>
+public sealed record ComClass(string? Name, string? Server);
+
+/// <summary>
+/// Finds the runtimes an application needs from the DLLs its executables import, the ActiveX controls of their dialogs
+/// and its .NET configuration.
+/// </summary>
 public static class PrerequisiteAnalyzer
 {
+    public const string FlashClsId = "{D27CDB6E-AE6D-11CF-96B8-444553540000}";
+
     private const int MaxBinaries = 3000;
     private const long MaxBinarySize = 256L * 1024 * 1024;
 
@@ -37,9 +46,14 @@ public static class PrerequisiteAnalyzer
         ["Microsoft.AspNetCore.App"] = "ASP.NET Core Runtime",
     };
 
-    public static IReadOnlyList<Prerequisite> Analyze(IFileSystem files, IEnumerable<string> roots)
+    /// <param name="findClass">
+    /// COM class registered on the source machine (CLSID, registry view), null when it is not registered; without it, ActiveX
+    /// controls are not analyzed.
+    /// </param>
+    public static IReadOnlyList<Prerequisite> Analyze(IFileSystem files, IEnumerable<string> roots, Func<string, RegView, ComClass?>? findClass = null)
     {
-        var allFiles = roots.SelectMany(r => files.EnumerateFiles(r, recursive: true)).ToList();
+        var rootList = roots.ToList();
+        var allFiles = rootList.SelectMany(r => files.EnumerateFiles(r, recursive: true)).ToList();
         var localNames = allFiles.Select(WinPath.GetFileName).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var found = new List<Prerequisite>();
 
@@ -80,6 +94,9 @@ public static class PrerequisiteAnalyzer
                         { Architecture = arch });
             }
 
+            if (findClass is not null)
+                found.AddRange(ActiveXControls(pe, name, arch, rootList, findClass));
+
             // Windows does not start an executable made for a later version than its own.
             if (pe.SubsystemVersion is { } subsystem && binary.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
                 RequireWindows(subsystem, $"{name} is made for {WindowsName(subsystem)} and later");
@@ -117,6 +134,35 @@ public static class PrerequisiteAnalyzer
             .Select(g => g.First())
             .ToList();
     }
+
+    /// <summary>
+    /// ActiveX controls of the dialogs that another product registered on the source machine. Controls that are not
+    /// registered (the dialog is not used there) or that the application serves itself (moved with it) are left out.
+    /// </summary>
+    private static IEnumerable<Prerequisite> ActiveXControls(
+        PeInfo pe, string binary, string arch, List<string> roots, Func<string, RegView, ComClass?> findClass)
+    {
+        var view = arch == "x86" ? RegView.Registry32 : RegView.Registry64;
+        foreach (var clsid in pe.ActiveXControls)
+        {
+            if (findClass(clsid, view) is not { } com || (com.Server is { } server && roots.Any(r => WinPath.IsUnderOrEqual(server, r))))
+                continue;
+            var flash = clsid.Equals(FlashClsId, StringComparison.OrdinalIgnoreCase);
+            var name = flash ? "Adobe Flash Player (ActiveX)" : $"ActiveX control '{com.Name ?? clsid}'";
+            yield return new Prerequisite(PrerequisiteKind.ActiveX, $"{name} ({arch})",
+                $"{binary} hosts the ActiveX control {clsid}" + (com.Server is null ? "" : $", served on the source PC by {com.Server}"))
+            {
+                Architecture = arch,
+                Version = clsid,
+                Note = flash ? FlashNote(arch) : null,
+            };
+        }
+    }
+
+    private static string FlashNote(string arch) =>
+        "Flash Player reached its end of life in 2020: Windows 10 and 11 no longer include it (KB4577586) and its last versions "
+        + "refuse to play any content. Copy the Flash .ocx file of the source PC to the same folder here and register it from an "
+        + $@"elevated command prompt with %SystemRoot%\{(arch == "x86" ? "SysWOW64" : "System32")}\regsvr32.exe.";
 
     private static readonly Version Windows7 = new(6, 1);
     private static readonly Version Windows10 = new(10, 0);

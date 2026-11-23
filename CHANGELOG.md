@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-11-23
+
+### Added
+- Prerequisites: ActiveX controls of other products hosted in the dialogs of the executables (e.g. Adobe Flash Player,
+  removed from Windows 10 and 11), checked before deploying, with what to do for Flash Player.
+- Collection: `.ini` files that legacy applications keep in the Windows folder (named without a folder in their
+  executables), and their UAC VirtualStore copy.
+
+### Fixed
+- Components installed in a `Vendor\Product` folder of System32 or SysWOW64 (Adobe Flash Player ActiveX:
+  `SysWOW64\Macromed\Flash`, and its 64-bit part in System32) had no install folder: only their Uninstall key was
+  exported, without their files and COM classes.
+
 ## [1.1.0] - 2026-11-16
 
 ### Added

@@ -39,6 +39,19 @@ public class PeReaderTests
     }
 
     [Fact]
+    public void ReadsTheActiveXControlsOfTheDialogs()
+    {
+        const string flash = "{d27cdb6e-ae6d-11cf-96b8-444553540000}";
+        const string other = "{AAAAAAAA-0000-0000-0000-000000000001}";
+        var pe = PeReader.Read(new MemoryStream(PeBuilder.Build(PeInfo.MachineX86, ["kernel32.dll"], version: new Version(1, 2, 0, 0),
+            activeX: [flash, other, flash])))!;
+
+        Assert.Equal([flash.ToUpperInvariant(), other], pe.ActiveXControls);
+        Assert.Equal(new Version(1, 2, 0, 0), pe.FileVersion);
+        Assert.Empty(PeReader.Read(new MemoryStream(PeBuilder.Build(PeInfo.MachineX64, ["kernel32.dll"])))!.ActiveXControls);
+    }
+
+    [Fact]
     public void ReadsTheSubsystemVersion()
     {
         Assert.Equal(new Version(6, 2), PeReader.Read(new MemoryStream(PeBuilder.Build(PeInfo.MachineX64, ["kernel32.dll"], subsystem: new Version(6, 2))))!.SubsystemVersion);

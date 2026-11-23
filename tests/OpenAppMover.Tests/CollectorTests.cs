@@ -230,6 +230,47 @@ public class InstallRootTests
         }));
     }
 
+    private InstalledApp WithUninstaller(string uninstaller, string? displayIcon = null)
+    {
+        var app = _machine.App;
+        return new InstalledApp
+        {
+            Id = app.Id, KeyName = app.KeyName, RegistryPath = app.RegistryPath, Scope = app.Scope, View = app.View, RawValues = app.RawValues,
+            DisplayIcon = displayIcon,
+            Installer = new InstallerInfo { Type = InstallerType.Unknown, Confidence = 0, Evidence = [], UninstallerPath = uninstaller },
+        };
+    }
+
+    [Fact]
+    public void ComponentFolderInTheSystemFolders()
+    {
+        // Adobe Flash Player ActiveX: 32-bit part (and uninstaller) in SysWOW64, 64-bit part in System32.
+        _machine.Files
+            .Add(@"C:\Windows\SysWOW64\Macromed\Flash\FlashUtil32_32_0_0_330_ActiveX.exe")
+            .Add(@"C:\Windows\SysWOW64\Macromed\Flash\Flash32_32_0_0_330.ocx")
+            .Add(@"C:\Windows\System32\Macromed\Flash\Flash64_32_0_0_330.ocx");
+
+        var roots = Resolve(WithUninstaller(@"C:\Windows\SysWOW64\Macromed\Flash\FlashUtil32_32_0_0_330_ActiveX.exe",
+            @"C:\Windows\SysWOW64\Macromed\Flash\FlashUtil32_32_0_0_330_ActiveX.exe"));
+
+        Assert.Equal([@"C:\Windows\SysWOW64\Macromed\Flash", @"C:\Windows\System32\Macromed\Flash"], roots.Select(r => r.Path));
+        Assert.True(roots[0].IsPrimary);
+        Assert.Equal(Confidence.Probable, roots[1].Confidence);
+    }
+
+    [Theory]
+    [InlineData(@"C:\Windows\System32\spool\drivers\x64\3\uninst.exe")]
+    [InlineData(@"C:\Windows\SysWOW64\en-US\Vendor\uninst.exe")]
+    [InlineData(@"C:\Windows\SysWOW64\Vendor\uninst.exe")]
+    [InlineData(@"C:\Windows\Installer\{11111111-2222-3333-4444-555555555555}\uninst.exe")]
+    [InlineData(@"C:\Windows\Vendor\Product\uninst.exe")]
+    public void RejectsTheFoldersOfWindows(string uninstaller)
+    {
+        _machine.Files.Add(uninstaller);
+
+        Assert.Empty(Resolve(WithUninstaller(uninstaller)));
+    }
+
     [Fact]
     public void MergesNestedFoldersAndKeepsBestConfidence()
     {

@@ -36,6 +36,7 @@ public sealed class CollectionService(
         new SystemRegistryCollector(),
         new ClassesCollector(),
         new HeuristicDataCollector(),
+        new LegacyIniCollector(),
         new ServiceCollector(),
         new ScheduledTaskCollector(),
         new ShellExtensionCollector(),
@@ -71,8 +72,22 @@ public sealed class CollectionService(
 
         return new CollectionResult(context.InstallRoots, context.Keywords, Merge(items))
         {
-            Prerequisites = PrerequisiteAnalyzer.Analyze(files, context.InstallRoots.Select(r => r.Path)),
+            Prerequisites = PrerequisiteAnalyzer.Analyze(files, context.InstallRoots.Select(r => r.Path),
+                (clsid, view) => FindComClass(context, clsid, view)),
         };
+    }
+
+    /// <summary>A COM class registered for the machine (HKLM\SOFTWARE\Classes, in the given view).</summary>
+    private static ComClass? FindComClass(CollectionContext context, string clsid, RegView view)
+    {
+        using var key = context.Open(RegistryLocation.Machine(view, $@"SOFTWARE\Classes\CLSID\{clsid}"));
+        if (key is null)
+            return null;
+        using var inproc = key.OpenSubKey("InprocServer32");
+        using var local = key.OpenSubKey("LocalServer32");
+        // InprocServer32 is a path (possibly unquoted, with spaces), LocalServer32 a command line.
+        var server = inproc?.GetString("") is { Length: > 0 } dll ? dll.Trim('"') : CommandLine.ExtractExecutable(local?.GetString(""));
+        return new ComClass(key.GetString(""), server is null ? null : WinPath.Normalize(context.Expand(server, null)));
     }
 
     /// <summary>The MSI product of the application, or the MSI packages chained by its Burn bundle, largest first.</summary>

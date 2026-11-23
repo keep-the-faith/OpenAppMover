@@ -195,14 +195,15 @@ public sealed class DeploymentPlanner(IRegistrySource registry, IWritableFileSys
         var checker = new PrerequisiteChecker(registry, files, target.Machine);
         foreach (var prerequisite in manifest.Prerequisites)
         {
+            var note = prerequisite.Note is null ? "" : " " + prerequisite.Note;
             switch (checker.IsInstalled(prerequisite))
             {
                 case false:
                     issues.Add(new PackageIssue(IssueSeverity.Warning,
-                        $"Missing prerequisite: {prerequisite.Name}. Install it, otherwise the application may not start.", prerequisite.Reason));
+                        $"Missing prerequisite: {prerequisite.Name}. Install it, otherwise the application may not start.{note}", prerequisite.Reason));
                     break;
                 case null:
-                    issues.Add(new PackageIssue(IssueSeverity.Warning, $"Prerequisite not checked: {prerequisite.Name}.", prerequisite.Reason));
+                    issues.Add(new PackageIssue(IssueSeverity.Warning, $"Prerequisite not checked: {prerequisite.Name}.{note}", prerequisite.Reason));
                     break;
             }
         }

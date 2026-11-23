@@ -32,6 +32,7 @@ public sealed class PrerequisiteChecker(IRegistrySource registry, IFileSystem fi
             ? windows >= minimum
             : null,
         PrerequisiteKind.UniversalCrt => SystemFileExists("ucrtbase.dll", prerequisite.Architecture),
+        PrerequisiteKind.ActiveX => prerequisite.Version is { } clsid ? ComClassInstalled(clsid, prerequisite.Architecture) : null,
         _ => null,
     };
 
@@ -50,6 +51,42 @@ public sealed class PrerequisiteChecker(IRegistrySource registry, IFileSystem fi
     /// <summary>32-bit DLLs live in SysWOW64 on 64-bit Windows.</summary>
     private bool SystemFileExists(string fileName, string? architecture) =>
         files.FileExists(WinPath.Combine(architecture == "x86" ? machine.SysWow64 : machine.System32, fileName));
+
+    /// <summary>
+    /// The class is registered for the machine in the view of the application, and its server file exists (null when its
+    /// path cannot be resolved here).
+    /// </summary>
+    private bool? ComClassInstalled(string clsid, string? architecture)
+    {
+        var view = architecture == "x86" ? RegView.Registry32 : RegView.Registry64;
+        using var key = registry.OpenKey(RegHive.LocalMachine, view, $@"SOFTWARE\Classes\CLSID\{clsid}");
+        if (key is null)
+            return false;
+        using var inproc = key.OpenSubKey("InprocServer32");
+        using var local = key.OpenSubKey("LocalServer32");
+        var server = inproc?.GetString("") is { Length: > 0 } dll ? dll.Trim('"') : CommandLine.ExtractExecutable(local?.GetString(""));
+        if (server is null)
+            return false;
+        var path = ExpandSystemVariables(server, view);
+        var absolute = path.Length > 2 && path[1] == ':' || path.StartsWith(@"\\", StringComparison.Ordinal);
+        return path.Contains('%') || !absolute ? null : files.FileExists(path);
+    }
+
+    /// <summary>The variables found in COM registrations, for this machine's folders.</summary>
+    private string ExpandSystemVariables(string path, RegView view)
+    {
+        string Replace(string text, string variable, string value) => text.Replace($"%{variable}%", value, StringComparison.OrdinalIgnoreCase);
+        var programFiles = view == RegView.Registry32 ? machine.ProgramFilesX86 : machine.ProgramFiles;
+        path = Replace(path, "SystemRoot", machine.Windows);
+        path = Replace(path, "windir", machine.Windows);
+        path = Replace(path, "SystemDrive", machine.Windows[..2]);
+        path = Replace(path, "ProgramFiles(x86)", machine.ProgramFilesX86);
+        path = Replace(path, "ProgramW6432", machine.ProgramFiles);
+        path = Replace(path, "ProgramFiles", programFiles);
+        path = Replace(path, "CommonProgramFiles(x86)", WinPath.Combine(machine.ProgramFilesX86, "Common Files"));
+        path = Replace(path, "CommonProgramFiles", WinPath.Combine(programFiles, "Common Files"));
+        return path;
+    }
 
     /// <summary>%ProgramFiles%\dotnet\shared\&lt;framework&gt;\&lt;major.minor&gt;.x</summary>
     private bool? DotNetInstalled(Prerequisite prerequisite)

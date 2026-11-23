@@ -104,18 +104,19 @@ Inno Setup, NSIS, InstallShield, Squirrel, ClickOnce (not transferable).
 
 | Source | What it finds |
 |---|---|
-| Uninstall entry, install folders | install directories (also derived from MSI components), the Uninstall key |
+| Uninstall entry, install folders | install directories (also derived from MSI components; in System32/SysWOW64, only a `Vendor\Product` folder such as `Macromed\Flash`, with its 32/64-bit twin), the Uninstall key |
 | Windows Installer | installed components (registry), the `Registry` table of the cached `.msi`; for a WiX Burn bundle, those of every MSI package it chains |
 | Inno Setup | the uninstall log `unins000.dat` |
 | NSIS | the script of the uninstaller, decompiled by the embedded 7-Zip |
 | InstallShield, Wise, custom installers | paths listed in their logs (`setup.ilg`, `install.log`…) |
 | System | shortcuts, services and drivers, scheduled tasks, Run keys, App Paths, environment variables (PATH entries only), firewall rules, event log sources, COM classes and Explorer shell extensions (context menus…), ProgIDs, URL protocols and file associations |
 | Heuristic | data and settings named after the application or its publisher (AppData, ProgramData, Documents, `Software\Vendor\Product`, UAC VirtualStore) |
+| Legacy `.ini` files | `.ini` files that the executables name without a folder, kept by Windows in `%WINDIR%` (and their UAC VirtualStore copy) |
 | Dynamic analysis (optional) | what the application actually reads and writes while you use it |
 
 Every item has a confidence: **Certain** and **Probable** items are selected by default, **Possible** ones (guesses,
-shared or system files) are not. Prerequisites (Visual C++, .NET, WebView2, DirectX) are detected from the
-executables and checked on the target.
+shared or system files) are not. Prerequisites (Visual C++, .NET, WebView2, DirectX, ActiveX controls of other
+products such as Adobe Flash Player) are detected from the executables and checked on the target.
 
 ### 3. Package (`.appmove`)
 
@@ -149,6 +150,8 @@ It needs Windows 8 or later.
 
 - Firewall rules are written to the registry and only apply after the firewall service restarts.
 - Prerequisites are detected but not installed; drivers are not deployed; service account passwords must be set again.
+- ActiveX controls are detected in the dialogs of the executables (MFC, ATL) and registered for the machine; those of
+  Visual Basic 6 and .NET (WinForms) applications are not.
 - A target file in use makes the deployment fail (and roll back).
 - Child MSI packages of WiX Burn bundles are not followed; Inno Setup `.ini` changes are not collected; NSIS paths
   computed in variables are ignored.
@@ -183,8 +186,8 @@ The GitHub Actions workflow (`.github/workflows/build.yml`) builds and tests eve
 the executables as a workflow artifact. Pushing a tag `v<version>` also publishes the GitHub Release:
 
 ```
-git tag v1.1.0
-git push origin v1.1.0
+git tag v1.1.1
+git push origin v1.1.1
 ```
 
 The tag must match `<Version>` in `Directory.Build.props`, and `CHANGELOG.md` must have a section for that version: it

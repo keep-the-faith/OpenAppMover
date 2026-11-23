@@ -18,6 +18,8 @@ public enum PrerequisiteKind
     Windows,
     /// <summary>Universal C Runtime (ucrtbase.dll): part of Windows 10, an update (KB2999226) on Windows 7 / 8.1.</summary>
     UniversalCrt,
+    /// <summary>ActiveX control registered by another product; <see cref="Prerequisite.Version"/> is its CLSID.</summary>
+    ActiveX,
 }
 
 /// <summary>A runtime the application needs and that is not part of its files.</summary>
@@ -28,4 +30,6 @@ public sealed record Prerequisite(PrerequisiteKind Kind, string Name, string Rea
     public string? Version { get; init; }
     /// <summary>.NET shared framework name (Microsoft.NETCore.App, Microsoft.WindowsDesktop.App…).</summary>
     public string? Framework { get; init; }
+    /// <summary>What to do when it is missing, when there is more to say than "install it".</summary>
+    public string? Note { get; init; }
 }

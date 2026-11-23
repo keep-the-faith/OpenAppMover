@@ -23,6 +23,12 @@ public sealed record PeInfo(ushort Machine, string? ClrVersion, IReadOnlyList<st
     /// </summary>
     public Version? SubsystemVersion { get; init; }
 
+    /// <summary>
+    /// CLSIDs ("{D27CDB6E-…}", upper case) of the ActiveX controls placed in the dialogs of the image (MFC and ATL dialog
+    /// templates name a control by its CLSID).
+    /// </summary>
+    public IReadOnlyList<string> ActiveXControls { get; init; } = [];
+
     /// <summary>"x64", "x86", "arm64", or null for other machines.</summary>
     public string? Architecture => Machine switch
     {
@@ -33,12 +39,15 @@ public sealed record PeInfo(ushort Machine, string? ClrVersion, IReadOnlyList<st
     };
 }
 
-/// <summary>Minimal Portable Executable reader: machine, imports, delay imports, CLR header.</summary>
+/// <summary>Minimal Portable Executable reader: machine, imports, delay imports, CLR header, version and dialog resources.</summary>
 public static class PeReader
 {
     private const int ImportDirectory = 1;
     private const int ResourceDirectory = 2;
     private const int VersionResourceType = 16; // RT_VERSION
+    private const int DialogResourceType = 5;   // RT_DIALOG
+    private const int MaxDialogs = 4096;
+    private const int MaxDialogSize = 64 * 1024;
     private const uint FixedFileInfoSignature = 0xFEEF04BD;
     private const int DelayImportDirectory = 13;
     private const int ClrDirectory = 14;
@@ -147,54 +156,90 @@ public static class PeReader
         {
             FileVersion = ReadFileVersion(reader, directories, Offset),
             SubsystemVersion = subsystemVersion,
+            ActiveXControls = ReadActiveXControls(reader, directories, Offset),
         };
     }
 
-    /// <summary>Resource tree RT_VERSION → first name → first language → data, then VS_FIXEDFILEINFO.dwFileVersionMS/LS.</summary>
-    private static Version? ReadFileVersion(BinaryReader reader, (uint Rva, uint Size)[] directories, Func<uint, long?> offset)
+    /// <summary>
+    /// Data (file offset, size) of the resources of one type: resource tree type → every name → every language.
+    /// </summary>
+    private static IEnumerable<(long Offset, uint Size)> Resources(
+        BinaryReader reader, (uint Rva, uint Size)[] directories, Func<uint, long?> offset, int type, int max)
     {
         if (directories.Length <= ResourceDirectory || directories[ResourceDirectory].Rva == 0
             || offset(directories[ResourceDirectory].Rva) is not { } root)
-            return null;
+            yield break;
         var stream = reader.BaseStream;
+        const uint subdirectory = 0x80000000;
 
-        // First entry of a resource directory (optionally the one with this id); returns its offset field.
-        uint? Entry(long directory, int? id)
+        // (name or id, offset field) of the entries of a resource directory.
+        List<(uint Name, uint Target)> Entries(long directory)
         {
             stream.Position = directory + 12;
             var count = reader.ReadUInt16() + reader.ReadUInt16(); // named + id entries
-            for (var i = 0; i < Math.Min(count, 4096); i++)
-            {
-                var name = reader.ReadUInt32();
-                var target = reader.ReadUInt32();
-                if (id is null || name == id)
-                    return target;
-            }
-            return null;
+            var entries = new List<(uint, uint)>();
+            for (var i = 0; i < Math.Min(count, max); i++)
+                entries.Add((reader.ReadUInt32(), reader.ReadUInt32()));
+            return entries;
         }
 
-        const uint subdirectory = 0x80000000;
-        if (Entry(root, VersionResourceType) is not { } types || (types & subdirectory) == 0
-            || Entry(root + (types & ~subdirectory), null) is not { } names || (names & subdirectory) == 0
-            || Entry(root + (names & ~subdirectory), null) is not { } languages || (languages & subdirectory) != 0)
-            return null;
-
-        stream.Position = root + languages;
-        var dataRva = reader.ReadUInt32();
-        var size = reader.ReadUInt32();
-        if (offset(dataRva) is not { } data)
-            return null;
-        stream.Position = data;
-        var bytes = reader.ReadBytes((int)Math.Min(size, 1024));
-        for (var i = 0; i + 16 <= bytes.Length; i += 4)
+        var types = Entries(root).Where(e => e.Name == type && (e.Target & subdirectory) != 0).Select(e => e.Target).ToList();
+        if (types.Count == 0)
+            yield break;
+        var found = 0;
+        foreach (var (_, names) in Entries(root + (types[0] & ~subdirectory)).Where(e => (e.Target & subdirectory) != 0).ToList())
         {
-            if (BitConverter.ToUInt32(bytes, i) != FixedFileInfoSignature)
-                continue;
-            var high = BitConverter.ToUInt32(bytes, i + 8);
-            var low = BitConverter.ToUInt32(bytes, i + 12);
-            return new Version((int)(high >> 16), (int)(high & 0xFFFF), (int)(low >> 16), (int)(low & 0xFFFF));
+            foreach (var (_, language) in Entries(root + (names & ~subdirectory)).Where(e => (e.Target & subdirectory) == 0).ToList())
+            {
+                stream.Position = root + language;
+                var dataRva = reader.ReadUInt32();
+                var size = reader.ReadUInt32();
+                if (offset(dataRva) is { } data)
+                    yield return (data, size);
+                if (++found >= max)
+                    yield break;
+            }
+        }
+    }
+
+    /// <summary>First RT_VERSION resource, then VS_FIXEDFILEINFO.dwFileVersionMS/LS.</summary>
+    private static Version? ReadFileVersion(BinaryReader reader, (uint Rva, uint Size)[] directories, Func<uint, long?> offset)
+    {
+        foreach (var (data, size) in Resources(reader, directories, offset, VersionResourceType, max: 1))
+        {
+            reader.BaseStream.Position = data;
+            var bytes = reader.ReadBytes((int)Math.Min(size, 1024));
+            for (var i = 0; i + 16 <= bytes.Length; i += 4)
+            {
+                if (BitConverter.ToUInt32(bytes, i) != FixedFileInfoSignature)
+                    continue;
+                var high = BitConverter.ToUInt32(bytes, i + 8);
+                var low = BitConverter.ToUInt32(bytes, i + 12);
+                return new Version((int)(high >> 16), (int)(high & 0xFFFF), (int)(low >> 16), (int)(low & 0xFFFF));
+            }
         }
         return null;
+    }
+
+    /// <summary>
+    /// CLSIDs in the dialog templates: the class of an ActiveX control (MFC), or the text of an "AtlAxWin" window (ATL),
+    /// is "{xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx}" in UTF-16.
+    /// </summary>
+    private static IReadOnlyList<string> ReadActiveXControls(BinaryReader reader, (uint Rva, uint Size)[] directories, Func<uint, long?> offset)
+    {
+        var controls = new List<string>();
+        foreach (var (data, size) in Resources(reader, directories, offset, DialogResourceType, MaxDialogs))
+        {
+            reader.BaseStream.Position = data;
+            var bytes = reader.ReadBytes((int)Math.Min(size, MaxDialogSize));
+            var text = Encoding.Unicode.GetString(bytes, 0, bytes.Length & ~1);
+            for (var start = text.IndexOf('{'); start >= 0 && start + 38 <= text.Length; start = text.IndexOf('{', start + 1))
+            {
+                if (Guid.TryParseExact(text.Substring(start, 38), "B", out var clsid))
+                    controls.Add(clsid.ToString("B").ToUpperInvariant());
+            }
+        }
+        return controls.Distinct().ToList();
     }
 
     /// <summary>CLR header → metadata root → version string ("v4.0.30319").</summary>

@@ -39,6 +39,7 @@ public static partial class InstallRootResolver
         var accepted = candidates
             .Where(c => IsAcceptable(c.Path, context))
             .ToList();
+        accepted.AddRange(OtherSystemFolders(accepted, context));
 
         // Merge nested folders into their parent, keeping the best confidence. The first candidate is the primary one.
         var roots = new List<(string Path, Confidence Confidence, string Reason, bool Primary)>();
@@ -116,9 +117,57 @@ public static partial class InstallRootResolver
         return count == 0 ? null : WinPath.Normalize(string.Join("\\", left.Take(count)));
     }
 
-    /// <summary>Rejects missing folders and folders that are too broad (drive root, Program Files, a user profile…).</summary>
+    /// <summary>
+    /// Rejects missing folders, folders that are too broad (drive root, Program Files, a user profile…) and the Windows
+    /// folder, except an application's own folder in the system folders (<see cref="IsVendorSystemFolder"/>).
+    /// </summary>
     private static bool IsAcceptable(string path, CollectionContext context) =>
-        !context.IsTooBroad(path) && context.Files.DirectoryExists(path) && !WinPath.IsUnderOrEqual(path, context.Session.Machine.Windows);
+        !context.IsTooBroad(path) && context.Files.DirectoryExists(path)
+        && (!WinPath.IsUnderOrEqual(path, context.Session.Machine.Windows) || IsVendorSystemFolder(path, context.Session.Machine));
+
+    /// <summary>Folders of Windows itself in System32 / SysWOW64, which can hold the uninstaller of a driver or a component.</summary>
+    private static readonly HashSet<string> WindowsSystemFolders = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "drivers", "DriverStore", "spool", "wbem", "WindowsPowerShell", "catroot", "catroot2", "config", "LogFiles", "Tasks",
+        "Microsoft", "com", "inetsrv", "Sysprep", "oobe", "GroupPolicy", "GroupPolicyUsers", "migration", "wdi", "winevt",
+        "CodeIntegrity", "Speech", "Speech_OneCore", "ias", "Dism", "MUI", "IME", "SMI", "Boot", "Recovery", "restore",
+        "NetworkList", "AdvancedInstallers", "appmgmt", "downlevel", "lxss", "WinMetadata", "Printing_Admin_Scripts", "Temp",
+    };
+
+    /// <summary>
+    /// "vendor\product" folder of a component installed in System32 or SysWOW64 (Adobe Flash Player ActiveX:
+    /// SysWOW64\Macromed\Flash), outside the folders of Windows itself and the language folders (en-US…).
+    /// </summary>
+    private static bool IsVendorSystemFolder(string path, MachineFolders machine)
+    {
+        foreach (var system in new[] { machine.System32, machine.SysWow64 })
+        {
+            if (!WinPath.IsUnderOrEqual(path, system) || WinPath.Normalize(path).Length <= WinPath.Normalize(system).Length)
+                continue;
+            var relative = WinPath.Normalize(path)[(WinPath.Normalize(system).Length + 1)..].Split('\\');
+            return relative.Length >= 2 && !WindowsSystemFolders.Contains(relative[0]) && !LanguageFolder().IsMatch(relative[0]);
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// A component installed in SysWOW64\Vendor\Product usually has its 64-bit part in System32\Vendor\Product (and the
+    /// other way round), outside the paths of its Uninstall entry.
+    /// </summary>
+    private static IEnumerable<(string Path, Confidence Confidence, string Reason)> OtherSystemFolders(
+        List<(string Path, Confidence Confidence, string Reason)> accepted, CollectionContext context)
+    {
+        var machine = context.Session.Machine;
+        foreach (var (path, _, _) in accepted.Where(c => IsVendorSystemFolder(c.Path, machine)).ToList())
+        {
+            var (from, to, part) = WinPath.IsUnderOrEqual(path, machine.SysWow64)
+                ? (machine.SysWow64, machine.System32, "64-bit")
+                : (machine.System32, machine.SysWow64, "32-bit");
+            var other = WinPath.Combine(to, WinPath.Normalize(path)[(WinPath.Normalize(from).Length + 1)..]);
+            if (IsAcceptable(other, context) && !accepted.Any(c => WinPath.IsUnderOrEqual(other, c.Path)))
+                yield return (other, Confidence.Probable, $"Same folder in {WinPath.GetFileName(to)} ({part} part)");
+        }
+    }
 
     /// <summary>Installer caches hold a copy of the setup, not the application.</summary>
     private static bool IsInstallerCache(string path) =>
@@ -127,6 +176,14 @@ public static partial class InstallRootResolver
 
     /// <summary>"C:\App\app.exe,0" → "C:\App\app.exe".</summary>
     public static string StripIconIndex(string icon) => IconIndex().Replace(icon.Trim().Trim('"'), "").Trim('"');
+
+#if NET7_0_OR_GREATER
+    [GeneratedRegex(@"^[a-z]{2,3}(-[a-z0-9]+)+$", RegexOptions.IgnoreCase)]
+    private static partial Regex LanguageFolder();
+#else
+    private static Regex? _languageFolder;
+    private static Regex LanguageFolder() => _languageFolder ??= new(@"^[a-z]{2,3}(-[a-z0-9]+)+$", RegexOptions.IgnoreCase);
+#endif
 
 #if NET7_0_OR_GREATER
     [GeneratedRegex(@",\s*-?\d+\s*$")]
